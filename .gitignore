@@ -1,2 +1,17 @@
-/build/
-/dist/
+
+# NetBeans
+nbproject/private/
+build/
+dist/
+*.log
+*.class
+*.war
+*.zip
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# IDE
+*.iml
+.idea/
