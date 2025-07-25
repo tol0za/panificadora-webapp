@@ -1,0 +1,64 @@
+/* login.css - Estilos solo para login.jsp */
+.login-body {
+    background-color: #f7f8fa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    font-family: 'Segoe UI', sans-serif;
+}
+
+.login-card {
+    padding: 2rem;
+    width: 100%;
+    max-width: 380px;
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    background: #fff;
+}
+
+.logo {
+    max-width: 120px;
+    margin-bottom: 20px;
+}
+
+.form-control {
+    border-radius: 10px;
+}
+
+/* Botón principal con color del logo */
+.btn-primary {
+    background-color: #966209;
+    border: none;
+    border-radius: 10px;
+    color: #fff;
+    font-weight: 600;
+    transition: background-color .2s;
+}
+
+/* Hover del botón */
+.btn-primary:hover {
+    background-color: #7a4f07;
+}
+
+/* Ajustes al input-group-text y toggle de contraseña */
+.input-group-text,
+.btn-outline-secondary {
+    border-radius: 0;
+    border: 1px solid #ccc;
+}
+
+.btn-outline-secondary {
+    border-left: none;
+    background-color: #e9ecef;
+}
+
+.btn-outline-secondary:hover {
+    background-color: #d0d5db;
+}
+
+/* Mensaje de error */
+.alert-danger {
+    font-size: 0.9rem;
+}
