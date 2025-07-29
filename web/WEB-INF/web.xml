@@ -6,6 +6,18 @@
         <servlet-name>CatalogoEmpaqueServlet</servlet-name>
         <servlet-class>servlet.CatalogoEmpaqueServlet</servlet-class>
     </servlet>
+    <servlet>
+        <servlet-name>TiendaServlet</servlet-name>
+        <servlet-class>servlet.CatalogoTiendaServlet</servlet-class>
+    </servlet>
+    <servlet>
+        <servlet-name>SalidaServlet</servlet-name>
+        <servlet-class>servlet.SalidaServlet</servlet-class>
+    </servlet>
+    <servlet>
+        <servlet-name>InventarioServlet</servlet-name>
+        <servlet-class>servlet.InventarioServlet</servlet-class>
+    </servlet>
     <servlet-mapping>
         <servlet-name>CatalogoPanServlet</servlet-name>
         <url-pattern>/CatalogoPanServlet</url-pattern>
@@ -13,6 +25,18 @@
     <servlet-mapping>
         <servlet-name>CatalogoEmpaqueServlet</servlet-name>
         <url-pattern>/CatalogoEmpaqueServlet</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>TiendaServlet</servlet-name>
+        <url-pattern>/TiendaServlet</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>SalidaServlet</servlet-name>
+        <url-pattern>/SalidaServlet</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>InventarioServlet</servlet-name>
+        <url-pattern>/InventarioServlet</url-pattern>
     </servlet-mapping>
     <welcome-file-list>
         <welcome-file>jsp/home/inicio.jsp</welcome-file>

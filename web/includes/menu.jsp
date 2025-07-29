@@ -9,12 +9,12 @@
     <img src="<c:url value='/img/logo.png' />"
          draggable="false"
          alt="Logo Panificadora"
-         style="max-width:150px;"/>
+         style="max-width:150px;" />
   </div>
-  
+
   <ul class="nav nav-pills flex-column" id="mainMenu">
-    
-    <!-- Inicio (visible para todos) -->
+
+    <!-- Inicio -->
     <li class="nav-item">
       <a class="nav-link active"
          href="${pageContext.request.contextPath}/jsp/bienvenida.jsp"
@@ -24,7 +24,7 @@
       </a>
     </li>
 
-    <!-- ADMINISTRADOR: Opciones de gestión -->
+    <!-- ADMINISTRADOR: Gestión exclusiva -->
     <c:if test="${rol == 'administrador'}">
       <li class="nav-item">
         <a class="nav-link"
@@ -52,13 +52,41 @@
       </li>
     </c:if>
 
-    <!-- Aquí puedes agregar más secciones si aplican -->
+    <!-- Salidas (Administrador y Empleado) -->
+    <li class="nav-item">
+      <a class="nav-link"
+         href="${pageContext.request.contextPath}/SalidaServlet"
+         draggable="false"
+         target="contentFrame">
+        <i class="bi bi-arrow-up-square"></i> Salidas
+      </a>
+    </li>
+
+    <!-- Tiendas (Administrador y Empleado) -->
+    <li class="nav-item">
+      <a class="nav-link"
+         href="${pageContext.request.contextPath}/CatalogoTiendaServlet?accion=listar"
+         draggable="false"
+         target="contentFrame">
+        <i class="bi bi-shop"></i> Tiendas
+      </a>
+    </li>
+
+    <!-- Inventarios (Administrador y Empleado) -->
+    <li class="nav-item">
+      <a class="nav-link"
+         href="${pageContext.request.contextPath}/InventarioServlet"
+         draggable="false"
+         target="contentFrame">
+        <i class="bi bi-box-seam"></i> Inventarios
+      </a>
+    </li>
 
   </ul>
 </nav>
 
 <script>
-  // Resalta el ítem activo
+  // Resalta el ítem activo al hacer clic
   document.querySelectorAll('#mainMenu .nav-link').forEach(link => {
     link.addEventListener('click', function() {
       document.querySelectorAll('#mainMenu .nav-link.active')

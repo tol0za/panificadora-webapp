@@ -8,8 +8,11 @@ public class Conexion {
     private static final String PASS = "";
 
     static {
-        try { Class.forName("com.mysql.cj.jdbc.Driver"); }
-        catch (Exception e) { throw new RuntimeException(e); }
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public static Connection getConnection() throws SQLException {
