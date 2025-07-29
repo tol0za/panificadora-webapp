@@ -17,12 +17,15 @@
   <div class="flex-grow-1 d-flex flex-column">
     <jsp:include page="/includes/header.jsp"/>
     <div class="flex-grow-1 overflow-auto">
-      <iframe name="contentFrame" src="${pageContext.request.contextPath}/jsp/bienvenida.jsp" frameborder="0"
-        class="w-100 h-100"></iframe>
-
+      <iframe name="contentFrame"
+              src="${pageContext.request.contextPath}/jsp/bienvenida.jsp"
+              frameborder="0"
+              class="w-100 h-100"></iframe>
     </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script> <!-- Agregado aquí -->
+
 </body>
 </html>

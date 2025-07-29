@@ -19,12 +19,14 @@ public class UsuarioDAO {
 
             if (rs.next()) {
                 Usuario u = new Usuario();
-                u.setIdUsuario(rs.getInt("id_usuario"));
-                u.setNombreUsuario(rs.getString("nombre_usuario"));
-                u.setApellidoUsuario(rs.getString("apellido_usuario"));
-                u.setUsuario(rs.getString("usuario"));
-                u.setPassword(rs.getString("password"));
-                u.setRol(rs.getString("rol"));
+                u.setId(rs.getInt("id_usuario"));                    // ← id
+                u.setNombre(rs.getString("nombre_usuario"));         // ← nombre
+                u.setApellido(rs.getString("apellido_usuario")); // ← asegúrate de que la columna existe y el nombre coincide
+                u.setUsuario(rs.getString("usuario"));               // ← usuario
+                u.setPassword(rs.getString("password"));             // ← password
+                u.setRol(rs.getString("rol"));                       // ← rol
+
+                // Puedes usar apellido si agregas el campo en Usuario
                 return u;
             }
 

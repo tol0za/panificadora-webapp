@@ -1,37 +1,36 @@
 package modelo;
 
 public class Usuario {
-
-    private int idUsuario;
-    private String nombreUsuario;
-    private String apellidoUsuario;
+    private int id;
+    private String nombre;
+    private String apellido;
     private String usuario;
     private String password;
     private String rol;
 
-    // Getters y Setters
-    public int getIdUsuario() {
-        return idUsuario;
+    public int getId() {
+        return id;
     }
 
-    public void setIdUsuario(int idUsuario) {
-        this.idUsuario = idUsuario;
+    public void setId(int id) {
+        this.id = id;
     }
 
-    public String getNombreUsuario() {
-        return nombreUsuario;
+    public String getNombre() {
+        return nombre;
     }
 
-    public void setNombreUsuario(String nombreUsuario) {
-        this.nombreUsuario = nombreUsuario;
+    public void setNombre(String nombre) {
+        this.nombre = nombre;
     }
 
-    public String getApellidoUsuario() {
-        return apellidoUsuario;
+    // ✅ Asegúrate de tener esto:
+    public String getApellido() {
+        return apellido;
     }
 
-    public void setApellidoUsuario(String apellidoUsuario) {
-        this.apellidoUsuario = apellidoUsuario;
+    public void setApellido(String apellido) {
+        this.apellido = apellido;
     }
 
     public String getUsuario() {

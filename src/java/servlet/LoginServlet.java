@@ -15,16 +15,19 @@ public class LoginServlet extends HttpServlet {
             throws ServletException, IOException {
         String user = req.getParameter("usuario");
         String pass = req.getParameter("password");
+
         try {
             Usuario u = dao.validar(user, pass);
+
             if (u != null) {
                 HttpSession ses = req.getSession();
                 ses.setAttribute("usuario", u);
-                resp.sendRedirect(req.getContextPath() + "/jsp/home/inicio.jsp");
+                ses.setAttribute("rol", u.getRol()); // ✅ ESTO FALTABA
 
+                resp.sendRedirect(req.getContextPath() + "/jsp/home/inicio.jsp");
             } else {
                 req.setAttribute("error", "Usuario o contraseña incorrectos");
-                req.getRequestDispatcher("/jsp/home/inicio.jsp").forward(req, resp);
+                req.getRequestDispatcher("/jsp/login/login.jsp").forward(req, resp);
             }
         } catch (Exception e) {
             throw new ServletException(e);
@@ -34,6 +37,6 @@ public class LoginServlet extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
-        resp.sendRedirect("/jsp/home/inicio.jsp");
+        resp.sendRedirect(req.getContextPath() + "/jsp/login/login.jsp");
     }
 }
