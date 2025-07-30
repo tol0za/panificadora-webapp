@@ -30,19 +30,16 @@ public class InventarioEmpaquetadoDAO {
                 InventarioEmpaquetado ie = new InventarioEmpaquetado();
                 ie.setIdInventario(rs.getInt("id_inventario"));
                 ie.setIdEmpaque(rs.getInt("id_empaque"));
+                ie.setNombreEmpaque(rs.getString("nombre_empaque"));
                 ie.setCantidad(rs.getInt("cantidad"));
                 ie.setMotivo(rs.getString("motivo"));
                 ie.setCantidadActual(rs.getInt("cantidad_actual"));
 
-                // Convierte Timestamp a LocalDateTime
-                java.sql.Timestamp timestamp = rs.getTimestamp("fecha");
+                Timestamp timestamp = rs.getTimestamp("fecha");
                 if (timestamp != null) {
                     ie.setFecha(timestamp.toLocalDateTime());
-                    // Conversión a java.util.Date para JSP
-                    Date fechaDate = Date.from(ie.getFecha().atZone(ZoneId.systemDefault()).toInstant());
-                    ie.setFechaDate(fechaDate);
+                    ie.setFechaDate(Date.from(ie.getFecha().atZone(ZoneId.systemDefault()).toInstant()));
                 }
-
                 lista.add(ie);
             }
         }
@@ -71,13 +68,14 @@ public class InventarioEmpaquetadoDAO {
         }
     }
 
+    // NUEVO CÁLCULO REAL DEL STOCK
     public int obtenerCantidadActual(int idEmpaque) throws SQLException {
-        String sql = "SELECT cantidad_actual FROM inventario_empaquetado WHERE id_empaque = ? ORDER BY fecha DESC LIMIT 1";
+        String sql = "SELECT SUM(cantidad) AS stock FROM inventario_empaquetado WHERE id_empaque = ?";
         try (PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setInt(1, idEmpaque);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
-                    return rs.getInt("cantidad_actual");
+                    return rs.getInt("stock"); // puede devolver 0 si no hay movimientos
                 } else {
                     return 0;
                 }

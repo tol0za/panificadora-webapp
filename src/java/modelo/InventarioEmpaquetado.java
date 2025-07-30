@@ -6,19 +6,20 @@ import java.util.Date;
 public class InventarioEmpaquetado {
     private int idInventario;
     private int idEmpaque;
+    private String nombreEmpaque; // nuevo campo
     private int cantidad;
     private LocalDateTime fecha;
     private String motivo;
     private int cantidadActual;
-
-    private Date fechaDate;  // <-- Agregado para JSP
+    private Date fechaDate;
 
     public InventarioEmpaquetado() {}
 
-    public InventarioEmpaquetado(int idInventario, int idEmpaque, int cantidad, LocalDateTime fecha,
+    public InventarioEmpaquetado(int idInventario, int idEmpaque, String nombreEmpaque, int cantidad, LocalDateTime fecha,
                                 String motivo, int cantidadActual) {
         this.idInventario = idInventario;
         this.idEmpaque = idEmpaque;
+        this.nombreEmpaque = nombreEmpaque;
         this.cantidad = cantidad;
         this.fecha = fecha;
         this.motivo = motivo;
@@ -30,6 +31,9 @@ public class InventarioEmpaquetado {
 
     public int getIdEmpaque() { return idEmpaque; }
     public void setIdEmpaque(int idEmpaque) { this.idEmpaque = idEmpaque; }
+
+    public String getNombreEmpaque() { return nombreEmpaque; }
+    public void setNombreEmpaque(String nombreEmpaque) { this.nombreEmpaque = nombreEmpaque; }
 
     public int getCantidad() { return cantidad; }
     public void setCantidad(int cantidad) { this.cantidad = cantidad; }
