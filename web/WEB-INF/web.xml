@@ -18,6 +18,22 @@
         <servlet-name>InventarioServlet</servlet-name>
         <servlet-class>servlet.InventarioServlet</servlet-class>
     </servlet>
+    <servlet>
+        <servlet-name>DetalleNotaVentaDAO</servlet-name>
+        <servlet-class>servlet.DetalleNotaVentaDAO</servlet-class>
+    </servlet>
+    <servlet>
+        <servlet-name>NotaVentaServlet</servlet-name>
+        <servlet-class>servlet.NotaVentaServlet</servlet-class>
+    </servlet>
+    <servlet>
+        <servlet-name>StockServlet</servlet-name>
+        <servlet-class>servlet.StockServlet</servlet-class>
+    </servlet>
+    <servlet>
+        <servlet-name>EmpaquesPorRepartidorServlet</servlet-name>
+        <servlet-class>servlet.EmpaquesPorRepartidorServlet</servlet-class>
+    </servlet>
     <servlet-mapping>
         <servlet-name>CatalogoPanServlet</servlet-name>
         <url-pattern>/CatalogoPanServlet</url-pattern>
@@ -37,6 +53,22 @@
     <servlet-mapping>
         <servlet-name>InventarioServlet</servlet-name>
         <url-pattern>/InventarioServlet</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>DetalleNotaVentaDAO</servlet-name>
+        <url-pattern>/DetalleNotaVentaDAO</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>NotaVentaServlet</servlet-name>
+        <url-pattern>/NotaVentaServlet</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>StockServlet</servlet-name>
+        <url-pattern>/StockServlet</url-pattern>
+    </servlet-mapping>
+    <servlet-mapping>
+        <servlet-name>EmpaquesPorRepartidorServlet</servlet-name>
+        <url-pattern>/EmpaquesPorRepartidorServlet</url-pattern>
     </servlet-mapping>
     <welcome-file-list>
         <welcome-file>jsp/home/inicio.jsp</welcome-file>

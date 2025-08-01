@@ -28,14 +28,6 @@
     <c:if test="${rol == 'administrador'}">
       <li class="nav-item">
         <a class="nav-link"
-           href="${pageContext.request.contextPath}/RepartidorServlet?accion=listar"
-           draggable="false"
-           target="contentFrame">
-          <i class="bi bi-truck"></i> Repartidores
-        </a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link"
            href="${pageContext.request.contextPath}/CatalogoPanServlet?accion=listar"
            draggable="false"
            target="contentFrame">
@@ -50,17 +42,15 @@
           <i class="bi bi-box"></i> Catálogo de Empaque
         </a>
       </li>
+      <li class="nav-item">
+        <a class="nav-link"
+           href="${pageContext.request.contextPath}/RepartidorServlet?accion=listar"
+           draggable="false"
+           target="contentFrame">
+          <i class="bi bi-truck"></i> Repartidores
+        </a>
+      </li>
     </c:if>
-
-    <!-- Salidas (Administrador y Empleado) -->
-    <li class="nav-item">
-      <a class="nav-link"
-         href="${pageContext.request.contextPath}/SalidaServlet"
-         draggable="false"
-         target="contentFrame">
-        <i class="bi bi-arrow-up-square"></i> Salidas
-      </a>
-    </li>
 
     <!-- Tiendas (Administrador y Empleado) -->
     <li class="nav-item">
@@ -79,6 +69,26 @@
          draggable="false"
          target="contentFrame">
         <i class="bi bi-box-seam"></i> Inventarios
+      </a>
+    </li>
+
+    <!-- Salidas (Administrador y Empleado) -->
+    <li class="nav-item">
+      <a class="nav-link"
+         href="${pageContext.request.contextPath}/SalidaServlet"
+         draggable="false"
+         target="contentFrame">
+        <i class="bi bi-arrow-up-square"></i> Salidas
+      </a>
+    </li>
+
+    <!-- Notas de Venta (Administrador y Empleado) -->
+    <li class="nav-item">
+      <a class="nav-link"
+         href="${pageContext.request.contextPath}/NotaVentaServlet?accion=listar"
+         draggable="false"
+         target="contentFrame">
+        <i class="bi bi-receipt"></i> Notas de Venta
       </a>
     </li>
 

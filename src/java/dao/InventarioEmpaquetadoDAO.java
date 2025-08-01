@@ -8,6 +8,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.math.BigDecimal;
 
 public class InventarioEmpaquetadoDAO {
     private Connection con;
@@ -68,18 +69,53 @@ public class InventarioEmpaquetadoDAO {
         }
     }
 
-    // NUEVO CÁLCULO REAL DEL STOCK
+    /** Stock real basado en último movimiento */
     public int obtenerCantidadActual(int idEmpaque) throws SQLException {
-        String sql = "SELECT SUM(cantidad) AS stock FROM inventario_empaquetado WHERE id_empaque = ?";
+        String sql = "SELECT cantidad_actual FROM inventario_empaquetado WHERE id_empaque = ? ORDER BY fecha DESC LIMIT 1";
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, idEmpaque);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getInt("cantidad_actual") : 0;
+            }
+        }
+    }
+
+    // --- Métodos adicionales útiles ---
+    public BigDecimal obtenerPrecioUnitario(int idEmpaque) throws SQLException {
+        String sql = "SELECT precio_unitario FROM catalogo_empaque WHERE id_empaque = ?";
         try (PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setInt(1, idEmpaque);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
-                    return rs.getInt("stock"); // puede devolver 0 si no hay movimientos
-                } else {
-                    return 0;
+                    return rs.getBigDecimal("precio_unitario");
                 }
             }
         }
+        return BigDecimal.ZERO;
     }
+
+    public void ajustarInventario(int idEmpaque, int delta, String motivo) throws SQLException {
+        int actual = obtenerCantidadActual(idEmpaque);
+        int nuevo = actual + delta;
+        String sqlInsert = "INSERT INTO inventario_empaquetado (id_empaque, cantidad, fecha, motivo, cantidad_actual) " +
+                           "VALUES (?, ?, NOW(), ?, ?)";
+        try (PreparedStatement ps = con.prepareStatement(sqlInsert)) {
+            ps.setInt(1, idEmpaque);
+            ps.setInt(2, delta);
+            ps.setString(3, motivo);
+            ps.setInt(4, nuevo);
+            ps.executeUpdate();
+        }
+    }
+    public int obtenerStockActual(int idEmpaque) throws SQLException {
+    String sql = "SELECT cantidad_actual FROM inventario_empaquetado WHERE id_empaque = ? ORDER BY fecha DESC LIMIT 1";
+    try (PreparedStatement stmt = con.prepareStatement(sql)) {
+        stmt.setInt(1, idEmpaque);
+        ResultSet rs = stmt.executeQuery();
+        if (rs.next()) {
+            return rs.getInt("cantidad_actual");
+        }
+    }
+    return 0;
+}
 }

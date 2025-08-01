@@ -33,7 +33,7 @@ public class RepartidorServlet extends HttpServlet {
         // ⛔ Verificación de rol
         if (!verificarAdmin(request)) {
             session.setAttribute("accesoDenegado", true);
-            request.getRequestDispatcher("/jsp/home/inicio.jsp").forward(request, response); // no rompe el iframe
+            request.getRequestDispatcher("/jsp/home/inicio.jsp").forward(request, response);
             return;
         }
 
@@ -69,7 +69,7 @@ public class RepartidorServlet extends HttpServlet {
         // ⛔ Verificación de rol
         if (!verificarAdmin(request)) {
             session.setAttribute("accesoDenegado", true);
-            request.getRequestDispatcher("/jsp/home/inicio.jsp").forward(request, response); // no rompe el iframe
+            request.getRequestDispatcher("/jsp/home/inicio.jsp").forward(request, response);
             return;
         }
 
@@ -101,7 +101,8 @@ public class RepartidorServlet extends HttpServlet {
 
     private void listarRepartidores(HttpServletRequest request, HttpServletResponse response)
             throws SQLException, ServletException, IOException {
-        List<Repartidor> lista = repartidorDAO.listarTodos();
+        // AJUSTA EL MÉTODO segun tu DAO real
+        List<Repartidor> lista = repartidorDAO.listar();
         request.setAttribute("listaRepartidores", lista);
         request.getRequestDispatcher("/jsp/admin/repartidorList.jsp").forward(request, response);
     }
@@ -124,7 +125,6 @@ public class RepartidorServlet extends HttpServlet {
         int id = Integer.parseInt(request.getParameter("id"));
         repartidorDAO.eliminar(id);
         request.getSession().setAttribute("mensaje", "eliminado");
-
         response.sendRedirect(request.getContextPath() + "/RepartidorServlet");
     }
 

@@ -9,27 +9,16 @@ public class Salida {
     private int idEmpaque;
     private int cantidad;
     private LocalDateTime fechaDistribucion;
+    private Date fechaDistribucionDate; // Para JSTL
+    // Extras para listado
+    private String nombreRepartidor;
+    private String apellidoRepartidor;
+    private String nombreEmpaque;
 
-    private Date fechaDistribucionDate; // para JSP
-
-    // Constructor vacío necesario para DAO y frameworks
-    public Salida() {
-    }
-
-    public Salida(int idDistribucion, int idRepartidor, int idEmpaque, int cantidad, LocalDateTime fechaDistribucion) {
-        this.idDistribucion = idDistribucion;
-        this.idRepartidor = idRepartidor;
-        this.idEmpaque = idEmpaque;
-        this.cantidad = cantidad;
-        this.fechaDistribucion = fechaDistribucion;
-    }
-
-    // Getters y setters
-
+    // Getters y Setters
     public int getIdDistribucion() {
         return idDistribucion;
     }
-
     public void setIdDistribucion(int idDistribucion) {
         this.idDistribucion = idDistribucion;
     }
@@ -37,7 +26,6 @@ public class Salida {
     public int getIdRepartidor() {
         return idRepartidor;
     }
-
     public void setIdRepartidor(int idRepartidor) {
         this.idRepartidor = idRepartidor;
     }
@@ -45,7 +33,6 @@ public class Salida {
     public int getIdEmpaque() {
         return idEmpaque;
     }
-
     public void setIdEmpaque(int idEmpaque) {
         this.idEmpaque = idEmpaque;
     }
@@ -53,7 +40,6 @@ public class Salida {
     public int getCantidad() {
         return cantidad;
     }
-
     public void setCantidad(int cantidad) {
         this.cantidad = cantidad;
     }
@@ -61,7 +47,6 @@ public class Salida {
     public LocalDateTime getFechaDistribucion() {
         return fechaDistribucion;
     }
-
     public void setFechaDistribucion(LocalDateTime fechaDistribucion) {
         this.fechaDistribucion = fechaDistribucion;
     }
@@ -69,8 +54,28 @@ public class Salida {
     public Date getFechaDistribucionDate() {
         return fechaDistribucionDate;
     }
-
     public void setFechaDistribucionDate(Date fechaDistribucionDate) {
         this.fechaDistribucionDate = fechaDistribucionDate;
+    }
+
+    public String getNombreRepartidor() {
+        return nombreRepartidor;
+    }
+    public void setNombreRepartidor(String nombreRepartidor) {
+        this.nombreRepartidor = nombreRepartidor;
+    }
+
+    public String getApellidoRepartidor() {
+        return apellidoRepartidor;
+    }
+    public void setApellidoRepartidor(String apellidoRepartidor) {
+        this.apellidoRepartidor = apellidoRepartidor;
+    }
+
+    public String getNombreEmpaque() {
+        return nombreEmpaque;
+    }
+    public void setNombreEmpaque(String nombreEmpaque) {
+        this.nombreEmpaque = nombreEmpaque;
     }
 }

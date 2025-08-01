@@ -2,13 +2,11 @@ package dao;
 
 import conexion.Conexion;
 import modelo.Tienda;
-
 import java.sql.*;
 import java.util.*;
 
 public class TiendaDAO {
     private Connection conn;
-
     public TiendaDAO() throws SQLException {
         this.conn = Conexion.getConnection();
     }
@@ -76,5 +74,10 @@ public class TiendaDAO {
             stmt.setInt(1, id);
             stmt.executeUpdate();
         }
+    }
+
+    // === Para compatibilidad con findAll() ===
+    public List<Tienda> findAll() throws SQLException {
+        return listar();
     }
 }

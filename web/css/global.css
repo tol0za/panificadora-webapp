@@ -136,3 +136,9 @@ nav {
 /* Margin utilities */
 .ms-auto { margin-left: auto; }
 .me-3    { margin-right: 1rem; }
+
+/* Contenedor más estrecho para formularios centrados */
+.form-container {
+  max-width: 600px;
+  margin: 0 auto;
+}
