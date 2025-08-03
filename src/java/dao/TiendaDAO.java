@@ -28,7 +28,9 @@ public class TiendaDAO {
         }
         return lista;
     }
-
+public List<Tienda> listarTodas() throws SQLException {
+    return listar();           // o  return obtenerTodas();
+}
     public Tienda buscarPorId(int id) throws SQLException {
         String sql = "SELECT * FROM tiendas WHERE id_tienda=?";
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {

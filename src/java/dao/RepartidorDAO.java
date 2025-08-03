@@ -58,7 +58,10 @@ public class RepartidorDAO {
         }
         return null;
     }
-
+    
+public Repartidor obtener(int idRepartidor) throws SQLException {
+    return buscarPorId(idRepartidor);
+}
     public List<Repartidor> listar() throws SQLException {
         List<Repartidor> lista = new ArrayList<>();
         String sql = "SELECT * FROM repartidores ORDER BY id_repartidor DESC";

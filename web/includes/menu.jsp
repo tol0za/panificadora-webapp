@@ -91,11 +91,7 @@
         <i class="bi bi-receipt"></i> Notas de Venta
       </a>
     </li>
-    <li class="nav-item">
-  <a class="nav-link" href="${ctx}/NotaVentaServlet?accion=listar">
-    <i class="bi bi-receipt"></i> Notas
-  </a>
-</li>
+ 
 
   </ul>
 </nav>

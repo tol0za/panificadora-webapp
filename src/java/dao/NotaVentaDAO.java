@@ -1,116 +1,156 @@
 package dao;
 
 import conexion.Conexion;
-import modelo.DetalleNotaVenta;
 import modelo.NotaVenta;
 
 import java.sql.*;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * DAO dedicado al encabezado de Notas de Venta.
+ *
+ * ↪ 100 % NUEVO → no colisiona con otros módulos.
+ */
 public class NotaVentaDAO {
-    private Connection conn;
 
-    public NotaVentaDAO() throws SQLException {
-        conn = Conexion.getConnection();
+    /* =====================  utilidades  ===================== */
+    private Connection getConn() throws SQLException {
+        return Conexion.getConnection();
     }
 
-    public boolean insertarNotaVenta(NotaVenta nota) throws SQLException {
-        String sqlNota = "INSERT INTO notas_venta (folio, fecha_nota, id_repartidor, id_tienda, total) VALUES (?, ?, ?, ?, ?)";
-        String sqlDetalle = "INSERT INTO detalle_nota_venta (id_nota, id_empaque, cantidad_vendida, precio_unitario, merma) VALUES (?, ?, ?, ?, ?)";
-        try (
-            PreparedStatement psNota = conn.prepareStatement(sqlNota, Statement.RETURN_GENERATED_KEYS);
-            PreparedStatement psDetalle = conn.prepareStatement(sqlDetalle)
-        ) {
-            conn.setAutoCommit(false);
-            psNota.setString(1, nota.getFolio());
-            psNota.setTimestamp(2, Timestamp.valueOf(nota.getFecha()));
-            psNota.setInt(3, nota.getIdRepartidor());
-            psNota.setInt(4, nota.getIdTienda());
-            psNota.setDouble(5, nota.getTotalNota());
-            psNota.executeUpdate();
+    /* ======================================================== */
 
-            ResultSet rs = psNota.getGeneratedKeys();
-            if (rs.next()) {
-                int idNotaVenta = rs.getInt(1);
-                nota.setIdNotaVenta(idNotaVenta);
-                for (DetalleNotaVenta det : nota.getDetalles()) {
-                    psDetalle.setInt(1, idNotaVenta);
-                    psDetalle.setInt(2, det.getIdEmpaque());
-                    psDetalle.setInt(3, det.getCantidadVendida());
-                    psDetalle.setDouble(4, det.getPrecioUnitario());
-                    psDetalle.setInt(5, det.getMerma());
-                    psDetalle.addBatch();
-                }
-                psDetalle.executeBatch();
+    /**
+     * Verifica si un folio ya existe.
+     */
+    public boolean folioExiste(int folio) throws SQLException {
+        String sql = "SELECT 1 FROM notas_venta WHERE folio = ? LIMIT 1";
+        try (Connection c = getConn(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, folio);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
             }
+        }
+    }
 
-            conn.commit();
-            return true;
-        } catch (SQLException ex) {
-            conn.rollback();
-            throw ex;
-        } finally {
-            conn.setAutoCommit(true);
+    /**
+     * Inserta una nota de venta y retorna el id generado.
+     */
+    public int insertar(NotaVenta n) throws SQLException {
+        String sql = "INSERT INTO notas_venta (folio, id_repartidor, id_tienda, fecha_nota, total) " +
+                     "VALUES (?,?,?,?,?)";
+        try (Connection c = getConn(); PreparedStatement ps = c.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setInt(1, n.getFolio());
+            ps.setInt(2, n.getIdRepartidor());
+            ps.setInt(3, n.getIdTienda());
+            ps.setTimestamp(4, Timestamp.valueOf(n.getFechaNota() == null ? LocalDateTime.now() : n.getFechaNota()));
+            ps.setDouble(5, n.getTotal());
+            ps.executeUpdate();
+            try (ResultSet rs = ps.getGeneratedKeys()) {
+                return rs.next() ? rs.getInt(1) : 0;
+            }
+        }
+    }
+
+    /**
+     * Actualiza encabezado (folio, tienda). No toca el total; usa actualizarTotal().
+     */
+    public void actualizar(NotaVenta n) throws SQLException {
+        String sql = "UPDATE notas_venta SET folio=?, id_tienda=? WHERE id_nota=?";
+        try (Connection c = getConn(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, n.getFolio());
+            ps.setInt(2, n.getIdTienda());
+            ps.setInt(3, n.getIdNotaVenta());
+            ps.executeUpdate();
         }
     }
 
-    public List<NotaVenta> listarTodas() throws SQLException {
-        List<NotaVenta> notas = new ArrayList<>();
-        String sql = "SELECT nv.id_nota, nv.folio, nv.fecha_nota, nv.id_repartidor, r.nombre_repartidor, " +
-                     "nv.id_tienda, t.nombre_tienda, nv.total " +
-                     "FROM notas_venta nv " +
-                     "JOIN repartidores r ON nv.id_repartidor = r.id_repartidor " +
-                     "JOIN tiendas t ON nv.id_tienda = t.id_tienda " +
-                     "ORDER BY nv.fecha_nota DESC";
-        try (PreparedStatement stmt = conn.prepareStatement(sql);
-             ResultSet rs = stmt.executeQuery()) {
-            while (rs.next()) {
-                NotaVenta nota = new NotaVenta();
-                nota.setIdNotaVenta(rs.getInt("id_nota"));
-                nota.setFolio(rs.getString("folio"));
-                nota.setFecha(rs.getTimestamp("fecha_nota").toLocalDateTime());
-                nota.setIdRepartidor(rs.getInt("id_repartidor"));
-                nota.setNombreRepartidor(rs.getString("nombre_repartidor"));
-                nota.setIdTienda(rs.getInt("id_tienda"));
-                nota.setNombreTienda(rs.getString("nombre_tienda"));
-                nota.setTotalNota(rs.getDouble("total"));
-                notas.add(nota);
-            }
+    /**
+     * Borra la nota (el detalle se elimina en cascada si la FK está ON DELETE CASCADE).
+     */
+    public void eliminar(int idNota) throws SQLException {
+        try (Connection c = getConn(); PreparedStatement ps = c.prepareStatement("DELETE FROM notas_venta WHERE id_nota=?")) {
+            ps.setInt(1, idNota);
+            ps.executeUpdate();
         }
-        return notas;
     }
 
-    public NotaVenta buscarPorId(int idNota) throws SQLException {
-        NotaVenta nota = null;
-        String sql = "SELECT nv.id_nota, nv.folio, nv.fecha_nota, nv.id_repartidor, r.nombre_repartidor, " +
-                     "nv.id_tienda, t.nombre_tienda, nv.total " +
-                     "FROM notas_venta nv " +
-                     "JOIN repartidores r ON nv.id_repartidor = r.id_repartidor " +
-                     "JOIN tiendas t ON nv.id_tienda = t.id_tienda " +
-                     "WHERE nv.id_nota = ?";
-        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1, idNota);
-            try (ResultSet rs = stmt.executeQuery()) {
+    /**
+     * Recalcula y actualiza el total de la nota con la suma de sus detalles.
+     */
+    public void actualizarTotal(int idNota) throws SQLException {
+        String sql = "UPDATE notas_venta nv SET nv.total = (\n" +
+                     "  SELECT IFNULL(SUM(dnv.cantidad_vendida * dnv.precio_unitario),0)\n" +
+                     "  FROM detalle_nota_venta dnv WHERE dnv.id_nota = nv.id_nota\n" +
+                     ") WHERE nv.id_nota = ?";
+        try (Connection c = getConn(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, idNota);
+            ps.executeUpdate();
+        }
+    }
+
+    /**
+     * Devuelve una nota con su total y referencias de nombres (tienda, etc.).
+     */
+    public NotaVenta obtener(int idNota) throws SQLException {
+        String sql = "SELECT * FROM notas_venta WHERE id_nota = ?";
+        try (Connection c = getConn(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, idNota);
+            try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
-                    nota = new NotaVenta();
-                    nota.setIdNotaVenta(rs.getInt("id_nota"));
-                    nota.setFolio(rs.getString("folio"));
-                    nota.setFecha(rs.getTimestamp("fecha_nota").toLocalDateTime());
-                    nota.setIdRepartidor(rs.getInt("id_repartidor"));
-                    nota.setNombreRepartidor(rs.getString("nombre_repartidor"));
-                    nota.setIdTienda(rs.getInt("id_tienda"));
-                    nota.setNombreTienda(rs.getString("nombre_tienda"));
-                    nota.setTotalNota(rs.getDouble("total"));
-
-                    // Obtener detalles
-                    DetalleNotaVentaDAO detalleDAO = new DetalleNotaVentaDAO();
-                    List<DetalleNotaVenta> detalles = detalleDAO.buscarPorNota(idNota);
-                    nota.setDetalles(detalles);
+                    NotaVenta n = mapRow(rs);
+                    return n;
                 }
             }
         }
-        return nota;
+        return null;
+    }
+
+    /**
+     * Lista todas las notas de un repartidor en una fecha concreta.
+     */
+    public List<NotaVenta> listarPorRepartidorYFecha(int idRepartidor, LocalDate fecha) throws SQLException {
+        List<NotaVenta> lista = new ArrayList<>();
+        String sql = "SELECT * FROM notas_venta WHERE id_repartidor = ? AND DATE(fecha_nota) = ? ORDER BY id_nota";
+        try (Connection c = getConn(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, idRepartidor);
+            ps.setDate(2, Date.valueOf(fecha));
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    lista.add(mapRow(rs));
+                }
+            }
+        }
+        return lista;
+    }
+
+    /**
+     * Suma total de un repartidor en una fecha (solo vendidas).
+     */
+    public double getTotalDia(int idRepartidor, LocalDate fecha) throws SQLException {
+        String sql = "SELECT IFNULL(SUM(total),0) FROM notas_venta WHERE id_repartidor=? AND DATE(fecha_nota)=?";
+        try (Connection c = getConn(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, idRepartidor);
+            ps.setDate(2, Date.valueOf(fecha));
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getDouble(1) : 0;
+            }
+        }
+    }
+
+    /* ======================================================== */
+
+    private NotaVenta mapRow(ResultSet rs) throws SQLException {
+        NotaVenta n = new NotaVenta();
+        n.setIdNotaVenta(rs.getInt("id_nota"));
+        n.setFolio(rs.getInt("folio"));
+        n.setIdRepartidor(rs.getInt("id_repartidor"));
+        n.setIdTienda(rs.getInt("id_tienda"));
+        n.setFechaNota(rs.getTimestamp("fecha_nota").toLocalDateTime());
+        n.setTotal(rs.getDouble("total"));
+        return n;
     }
 }

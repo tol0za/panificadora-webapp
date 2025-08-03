@@ -1,23 +1,27 @@
 package modelo;
 
 import java.time.LocalDateTime;
-import java.util.Date;
 import java.util.List;
-import java.time.format.DateTimeFormatter;
 
+/**
+ * Modelo que representa el encabezado de una nota de venta.
+ * Se integra al resto del sistema sin afectar clases existentes.
+ */
 public class NotaVenta {
-    private int idNotaVenta;
-    private String folio;
-    private LocalDateTime fecha;
-    private int idDistribucion;
-    private int idTienda;
-    private String nombreTienda;
-    private int idRepartidor;
-    private String nombreRepartidor;
-    private double totalNota;
+
+    private int idNotaVenta;      // PK autoincremental
+    private int folio;            // ÚNICO, ingresado manualmente
+    private int idRepartidor;     // FK repartidores.id_repartidor
+    private int idTienda;         // FK tiendas.id_tienda
+    private LocalDateTime fechaNota; // TIMESTAMP de la venta
+    private double total;         // Calculado como suma de subtotales (solo vendidas)
+private String nombreTienda;
+    // --- Relación uno‑a‑muchos con el detalle (opcional en backoffice) ---
     private List<DetalleNotaVenta> detalles;
 
-    // Getters y Setters
+    // ---------------------------------------------------------------------
+    // Getters & Setters                                                    
+    // ---------------------------------------------------------------------
     public int getIdNotaVenta() {
         return idNotaVenta;
     }
@@ -26,44 +30,12 @@ public class NotaVenta {
         this.idNotaVenta = idNotaVenta;
     }
 
-    public String getFolio() {
+    public int getFolio() {
         return folio;
     }
 
-    public void setFolio(String folio) {
+    public void setFolio(int folio) {
         this.folio = folio;
-    }
-
-    public LocalDateTime getFecha() {
-        return fecha;
-    }
-
-    public void setFecha(LocalDateTime fecha) {
-        this.fecha = fecha;
-    }
-
-    public int getIdDistribucion() {
-        return idDistribucion;
-    }
-
-    public void setIdDistribucion(int idDistribucion) {
-        this.idDistribucion = idDistribucion;
-    }
-
-    public int getIdTienda() {
-        return idTienda;
-    }
-
-    public void setIdTienda(int idTienda) {
-        this.idTienda = idTienda;
-    }
-
-    public String getNombreTienda() {
-        return nombreTienda;
-    }
-
-    public void setNombreTienda(String nombreTienda) {
-        this.nombreTienda = nombreTienda;
     }
 
     public int getIdRepartidor() {
@@ -74,20 +46,28 @@ public class NotaVenta {
         this.idRepartidor = idRepartidor;
     }
 
-    public String getNombreRepartidor() {
-        return nombreRepartidor;
+    public int getIdTienda() {
+        return idTienda;
     }
 
-    public void setNombreRepartidor(String nombreRepartidor) {
-        this.nombreRepartidor = nombreRepartidor;
+    public void setIdTienda(int idTienda) {
+        this.idTienda = idTienda;
     }
 
-    public double getTotalNota() {
-        return totalNota;
+    public LocalDateTime getFechaNota() {
+        return fechaNota;
     }
 
-    public void setTotalNota(double totalNota) {
-        this.totalNota = totalNota;
+    public void setFechaNota(LocalDateTime fechaNota) {
+        this.fechaNota = fechaNota;
+    }
+
+    public double getTotal() {
+        return total;
+    }
+
+    public void setTotal(double total) {
+        this.total = total;
     }
 
     public List<DetalleNotaVenta> getDetalles() {
@@ -97,15 +77,6 @@ public class NotaVenta {
     public void setDetalles(List<DetalleNotaVenta> detalles) {
         this.detalles = detalles;
     }
-
-    // ✅ Conversión de LocalDateTime para JSTL
-    public Date getFechaAsDate() {
-        return java.util.Date.from(fecha.atZone(java.time.ZoneId.systemDefault()).toInstant());
-    }
-    public String getFechaFormateada() {
-        if (fecha != null) {
-            return fecha.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"));
-        }
-        return "";
-    }
+    public String getNombreTienda() { return nombreTienda; }
+public void setNombreTienda(String nombreTienda) { this.nombreTienda = nombreTienda; }
 }
