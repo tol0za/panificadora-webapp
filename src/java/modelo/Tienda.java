@@ -5,6 +5,7 @@ public class Tienda {
     private String nombre;
     private String direccion;
     private String telefono;
+private String zona;
 
     public Tienda() {}
 
@@ -14,7 +15,13 @@ public class Tienda {
         this.direccion = direccion;
         this.telefono = telefono;
     }
+public String getNombreTienda() {
+    return nombre;
+}
 
+public void setNombreTienda(String nombre) {
+    this.nombre = nombre;
+}
     public int getIdTienda() {
         return idTienda;
     }
@@ -46,4 +53,11 @@ public class Tienda {
     public void setTelefono(String telefono) {
         this.telefono = telefono;
     }
+    public String getZona() {
+    return zona;
+}
+
+public void setZona(String zona) {
+    this.zona = zona;
+}
 }

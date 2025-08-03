@@ -4,9 +4,11 @@ import java.time.LocalDateTime;
 import java.util.Date;
 
 public class InventarioEmpaquetado {
+
     private int idInventario;
+    private int idDistribucion; // NUEVO
     private int idEmpaque;
-    private String nombreEmpaque; // nuevo campo
+    private String nombreEmpaque;
     private int cantidad;
     private LocalDateTime fecha;
     private String motivo;
@@ -15,9 +17,10 @@ public class InventarioEmpaquetado {
 
     public InventarioEmpaquetado() {}
 
-    public InventarioEmpaquetado(int idInventario, int idEmpaque, String nombreEmpaque, int cantidad, LocalDateTime fecha,
-                                String motivo, int cantidadActual) {
+    public InventarioEmpaquetado(int idInventario, int idDistribucion, int idEmpaque, String nombreEmpaque, int cantidad,
+                                 LocalDateTime fecha, String motivo, int cantidadActual) {
         this.idInventario = idInventario;
+        this.idDistribucion = idDistribucion;
         this.idEmpaque = idEmpaque;
         this.nombreEmpaque = nombreEmpaque;
         this.cantidad = cantidad;
@@ -28,6 +31,9 @@ public class InventarioEmpaquetado {
 
     public int getIdInventario() { return idInventario; }
     public void setIdInventario(int idInventario) { this.idInventario = idInventario; }
+
+    public int getIdDistribucion() { return idDistribucion; }
+    public void setIdDistribucion(int idDistribucion) { this.idDistribucion = idDistribucion; }
 
     public int getIdEmpaque() { return idEmpaque; }
     public void setIdEmpaque(int idEmpaque) { this.idEmpaque = idEmpaque; }

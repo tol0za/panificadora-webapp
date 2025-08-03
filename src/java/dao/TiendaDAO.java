@@ -80,4 +80,25 @@ public class TiendaDAO {
     public List<Tienda> findAll() throws SQLException {
         return listar();
     }
+    
+   public List<Tienda> obtenerTodas() throws SQLException {
+    List<Tienda> lista = new ArrayList<>();
+    String sql = "SELECT * FROM tiendas";
+    try (Connection conn = Conexion.getConnection();
+         PreparedStatement stmt = conn.prepareStatement(sql);
+         ResultSet rs = stmt.executeQuery()) {
+        while (rs.next()) {
+            Tienda t = new Tienda();
+            t.setIdTienda(rs.getInt("id_tienda"));
+            t.setNombreTienda(rs.getString("nombre_tienda"));
+            t.setDireccion(rs.getString("direccion"));
+            t.setTelefono(rs.getString("telefono"));
+            t.setZona(rs.getString("zona"));
+            lista.add(t);
+        }
+    }
+    return lista;
+}
+ 
+    
 }

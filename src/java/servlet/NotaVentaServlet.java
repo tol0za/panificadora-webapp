@@ -1,36 +1,33 @@
 package servlet;
-
 import dao.*;
 import modelo.*;
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.*;
-import java.io.*;
-import java.math.BigDecimal;
+import java.io.IOException;
 import java.sql.SQLException;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 
-@WebServlet("/NotasVentaServlet")
 public class NotaVentaServlet extends HttpServlet {
     private NotaVentaDAO notaVentaDAO;
+    private DetalleNotaVentaDAO detalleNotaDAO;
     private RepartidorDAO repartidorDAO;
-    private CatalogoEmpaqueDAO empaqueDAO;
-    private InventarioEmpaquetadoDAO inventarioDAO;
     private TiendaDAO tiendaDAO;
-    private DetalleNotaVentaDAO detalleDAO;
+    private CatalogoEmpaqueDAO empaqueDAO;
+    private DistribucionDAO distribucionDAO;
 
     @Override
     public void init() throws ServletException {
         try {
             notaVentaDAO = new NotaVentaDAO();
+            detalleNotaDAO = new DetalleNotaVentaDAO();
             repartidorDAO = new RepartidorDAO();
-            empaqueDAO = new CatalogoEmpaqueDAO();
-            inventarioDAO = new InventarioEmpaquetadoDAO();
             tiendaDAO = new TiendaDAO();
-            detalleDAO = new DetalleNotaVentaDAO();
+            empaqueDAO = new CatalogoEmpaqueDAO();
+            distribucionDAO = new DistribucionDAO();
         } catch (SQLException e) {
-            throw new ServletException("Error al inicializar DAOs", e);
+            throw new ServletException("Error al inicializar DAO", e);
         }
     }
 
@@ -39,150 +36,148 @@ public class NotaVentaServlet extends HttpServlet {
             throws ServletException, IOException {
         String accion = request.getParameter("accion");
         if (accion == null) accion = "listar";
-
         try {
             switch (accion) {
                 case "nuevo":
-                    cargarFormulario(request, response);
+                    mostrarFormulario(request, response);
                     break;
-                case "editar":
-                    editarNota(request, response);
-                    break;
-                case "eliminar":
-                    eliminarNota(request, response);
-                    break;
-                case "obtenerEmpaques":
-                    cargarEmpaquesPorRepartidor(request, response);
+                case "ver":
+                    mostrarDetalle(request, response);
                     break;
                 case "listar":
                 default:
                     listarNotas(request, response);
+                    break;
             }
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, ex.getMessage());
+        } catch (Exception e) {
+            e.printStackTrace();
+            request.setAttribute("mensaje", "Error: " + e.getMessage());
+            request.getRequestDispatcher("/jsp/notaventa/notaList.jsp").forward(request, response);
         }
     }
 
-    private void cargarFormulario(HttpServletRequest request, HttpServletResponse response) throws Exception {
-        List<Repartidor> repartidores = repartidorDAO.obtenerRepartidoresConSalidaHoy();
-        List<Tienda> tiendas = tiendaDAO.listar();
-        request.setAttribute("repartidores", repartidores);
-        request.setAttribute("tiendas", tiendas);
-        request.getRequestDispatcher("/jsp/notaventa/notaForm.jsp").forward(request, response);
+    private void mostrarFormulario(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        try {
+            List<Repartidor> repartidores = repartidorDAO.findAll();
+            List<Tienda> tiendas = tiendaDAO.findAll();
+            request.setAttribute("repartidores", repartidores);
+            request.setAttribute("tiendas", tiendas);
+            request.getRequestDispatcher("/jsp/notaventa/notaForm.jsp").forward(request, response);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            request.setAttribute("mensaje", "Error al cargar el formulario");
+            request.getRequestDispatcher("/jsp/notaventa/notaForm.jsp").forward(request, response);
+        }
     }
 
-    private void listarNotas(HttpServletRequest request, HttpServletResponse response) throws Exception {
-        LocalDate hoy = LocalDate.now();
-        java.sql.Date hoySQL = java.sql.Date.valueOf(hoy);
-        List<NotaVenta> notasVenta = notaVentaDAO.listarNotasPorDia(hoySQL);
-        BigDecimal totalNotasDia = notaVentaDAO.totalNotasDelDia(hoySQL);
-        request.setAttribute("notasVenta", notasVenta);
-        request.setAttribute("totalNotasDia", totalNotasDia);
+    private void listarNotas(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        try {
+            List<NotaVenta> listaNotas = notaVentaDAO.listarTodas();
+            request.setAttribute("listaNotas", listaNotas);
+        } catch (SQLException e) {
+            e.printStackTrace();
+            request.setAttribute("mensaje", "Error al obtener las notas");
+        }
         request.getRequestDispatcher("/jsp/notaventa/notaList.jsp").forward(request, response);
     }
 
-    private void cargarEmpaquesPorRepartidor(HttpServletRequest request, HttpServletResponse response) throws Exception {
-        int idRepartidor = Integer.parseInt(request.getParameter("idRepartidor"));
-        LocalDate hoy = LocalDate.now();
-        java.sql.Date hoySQL = java.sql.Date.valueOf(hoy);
-        List<CatalogoEmpaque> empaques = empaqueDAO.obtenerEmpaquesPorRepartidorYFecha(idRepartidor, hoySQL);
-        response.setContentType("application/json");
-        PrintWriter out = response.getWriter();
-        out.print("[");
-        for (int i = 0; i < empaques.size(); i++) {
-            CatalogoEmpaque e = empaques.get(i);
-            out.print("{\"id\":" + e.getIdEmpaque() + ",\"nombre\":\"" + e.getNombreEmpaque() + "\",\"precio\":" + e.getPrecioUnitario() + "}");
-            if (i < empaques.size() - 1) out.print(",");
+    private void mostrarDetalle(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        try {
+            int idNota = Integer.parseInt(request.getParameter("id"));
+            NotaVenta nota = notaVentaDAO.buscarPorId(idNota);
+            if (nota != null) {
+                List<DetalleNotaVenta> detalles = detalleNotaDAO.buscarPorNota(idNota);
+                for (DetalleNotaVenta d : detalles) {
+                    CatalogoEmpaque e = empaqueDAO.buscarPorId(d.getIdEmpaque());
+                    d.setNombreEmpaque(e != null ? e.getNombreEmpaque() : "");
+                }
+                nota.setDetalles(detalles);
+                request.setAttribute("nota", nota);
+                request.getRequestDispatcher("/jsp/notaventa/notaDetalle.jsp").forward(request, response);
+            } else {
+                request.getSession().setAttribute("mensaje", "Nota no encontrada");
+                response.sendRedirect("NotaVentaServlet?accion=listar");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            request.getSession().setAttribute("mensaje", "Error al cargar el detalle: " + e.getMessage());
+            response.sendRedirect("NotaVentaServlet?accion=listar");
         }
-        out.print("]");
-        out.close();
-    }
-
-    private void editarNota(HttpServletRequest request, HttpServletResponse response) throws Exception {
-        int idNota = Integer.parseInt(request.getParameter("idNota"));
-        NotaVenta nv = notaVentaDAO.obtenerNotaPorId(idNota);
-        List<DetalleNotaVenta> detalles = notaVentaDAO.listarDetallesPorNota(idNota);
-        List<Repartidor> repartidores = repartidorDAO.listar();
-        List<Tienda> tiendas = tiendaDAO.listar();
-        request.setAttribute("notaVenta", nv);
-        request.setAttribute("detalles", detalles);
-        request.setAttribute("repartidores", repartidores);
-        request.setAttribute("tiendas", tiendas);
-        request.getRequestDispatcher("/jsp/notaventa/notaForm.jsp").forward(request, response);
-    }
-
-    private void eliminarNota(HttpServletRequest request, HttpServletResponse response) throws Exception {
-        int idNota = Integer.parseInt(request.getParameter("idNota"));
-        detalleDAO.eliminarPorNota(idNota);
-        notaVentaDAO.eliminarNotaVenta(idNota);
-        request.getSession().setAttribute("mensaje", "Nota eliminada correctamente");
-        response.sendRedirect(request.getContextPath() + "/NotaVentaServlet?accion=listar");
     }
 
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-        String accion = request.getParameter("accion");
+        String referer = request.getHeader("referer");
+        if (referer == null || !referer.contains("/jsp/home/inicio.jsp")) {
+            response.sendRedirect(request.getContextPath() + "/jsp/home/inicio.jsp?vista=jsp/notaventa/notaList.jsp");
+            return;
+        }
+
         try {
-            if ("guardar".equals(accion)) {
-                guardarNota(request, response, false);
-            } else if ("actualizar".equals(accion)) {
-                guardarNota(request, response, true);
+            NotaVenta nota = new NotaVenta();
+            nota.setFolio(UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+            nota.setFecha(LocalDateTime.now());
+            nota.setIdDistribucion(Integer.parseInt(request.getParameter("id_distribucion")));
+            nota.setIdRepartidor(Integer.parseInt(request.getParameter("id_repartidor")));
+            nota.setIdTienda(Integer.parseInt(request.getParameter("id_tienda")));
+
+            double total = 0;
+            List<DetalleNotaVenta> detalles = new ArrayList<>();
+            String[] idEmpaques = request.getParameterValues("id_empaque[]");
+            String[] cantidades = request.getParameterValues("cantidad[]");
+            String[] mermas = request.getParameterValues("merma[]");
+            String[] precios = request.getParameterValues("precio_unitario[]");
+
+            for (int i = 0; i < idEmpaques.length; i++) {
+                DetalleNotaVenta det = new DetalleNotaVenta();
+                det.setIdEmpaque(Integer.parseInt(idEmpaques[i]));
+                det.setCantidadVendida(Integer.parseInt(cantidades[i]));
+                det.setMerma(Integer.parseInt(mermas[i]));
+                det.setPrecioUnitario(Double.parseDouble(precios[i]));
+                double totalLinea = det.getCantidadVendida() * det.getPrecioUnitario();
+                det.setTotalLinea(totalLinea);
+                total += totalLinea;
+                detalles.add(det);
             }
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            request.getSession().setAttribute("mensaje", "Error: " + ex.getMessage());
+
+            nota.setTotalNota(total);
+            nota.setDetalles(detalles);
+
+            boolean guardado = notaVentaDAO.insertarNotaVenta(nota);
+            if (guardado) {
+                InventarioEmpaquetadoDAO inventarioDAO = new InventarioEmpaquetadoDAO();
+                for (DetalleNotaVenta d : detalles) {
+                    inventarioDAO.actualizarStockDespuesVenta(
+                        nota.getIdDistribucion(),
+                        d.getIdEmpaque(),
+                        d.getCantidadVendida(),
+                        d.getMerma()
+                    );
+
+                    InventarioEmpaquetado movimiento = new InventarioEmpaquetado();
+                    movimiento.setIdDistribucion(nota.getIdDistribucion());
+                    movimiento.setIdEmpaque(d.getIdEmpaque());
+                    movimiento.setCantidad(-(d.getCantidadVendida() + d.getMerma()));
+                    movimiento.setFecha(nota.getFecha());
+                    movimiento.setMotivo("Salida por Venta");
+                    movimiento.setCantidadActual(inventarioDAO.obtenerCantidadActualPorRepartidorYEmpaque(
+                        nota.getIdRepartidor(), d.getIdEmpaque()));
+                    inventarioDAO.registrarMovimiento(movimiento);
+                }
+                request.getSession().setAttribute("mensaje", "Nota de venta registrada correctamente.");
+            } else {
+                request.getSession().setAttribute("mensaje", "No se pudo guardar la nota.");
+            }
             response.sendRedirect(request.getContextPath() + "/NotaVentaServlet?accion=listar");
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            request.getSession().setAttribute("mensaje", "Error al guardar: " + e.getMessage());
+            response.sendRedirect(request.getContextPath() + "/NotaVentaServlet?accion=nuevo");
         }
-    }
-
-    private void guardarNota(HttpServletRequest request, HttpServletResponse response, boolean esActualizacion)
-            throws Exception {
-        int idNota = esActualizacion ? Integer.parseInt(request.getParameter("idNota")) : 0;
-        int idRepartidor = Integer.parseInt(request.getParameter("idRepartidor"));
-        int idTienda = Integer.parseInt(request.getParameter("idTienda"));
-        String[] idEmpaques = request.getParameterValues("idEmpaque[]");
-        String[] cantidades = request.getParameterValues("cantidad[]");
-        String[] precios = request.getParameterValues("precioUnitario[]");
-
-        BigDecimal totalNota = BigDecimal.ZERO;
-        List<DetalleNotaVenta> detalles = new ArrayList<>();
-        for (int i = 0; i < idEmpaques.length; i++) {
-            DetalleNotaVenta det = new DetalleNotaVenta();
-            det.setIdEmpaque(Integer.parseInt(idEmpaques[i]));
-            int cantidad = Integer.parseInt(cantidades[i]);
-            det.setCantidad(cantidad);
-            BigDecimal precio = new BigDecimal(precios[i]);
-            det.setPrecioUnitario(precio);
-            det.setSubtotal(precio.multiply(BigDecimal.valueOf(cantidad)));
-            detalles.add(det);
-            totalNota = totalNota.add(det.getSubtotal());
-        }
-
-        NotaVenta nota = new NotaVenta();
-        nota.setIdNota(idNota);
-        nota.setIdRepartidor(idRepartidor);
-        nota.setIdTienda(idTienda);
-        nota.setTotal(totalNota);
-
-        if (!esActualizacion) {
-            int idNotaNueva = notaVentaDAO.insertarNotaVenta(nota);
-            detalleDAO.eliminarPorNota(idNotaNueva); // Prevención doble registro
-            notaVentaDAO.insertarDetalleNotaVenta(detalles, idNotaNueva);
-            for (DetalleNotaVenta det : detalles) {
-                inventarioDAO.ajustarInventario(det.getIdEmpaque(), -det.getCantidad(), "Venta nota");
-            }
-            request.getSession().setAttribute("mensaje", "Nota registrada correctamente");
-        } else {
-            notaVentaDAO.actualizarNotaVenta(nota);
-            detalleDAO.eliminarPorNota(idNota);
-            notaVentaDAO.insertarDetalleNotaVenta(detalles, idNota);
-            for (DetalleNotaVenta det : detalles) {
-                inventarioDAO.ajustarInventario(det.getIdEmpaque(), -det.getCantidad(), "Actualización de nota");
-            }
-            request.getSession().setAttribute("mensaje", "Nota actualizada correctamente");
-        }
-        response.sendRedirect(request.getContextPath() + "/NotaVentaServlet?accion=listar");
     }
 }

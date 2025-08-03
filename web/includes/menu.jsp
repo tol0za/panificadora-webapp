@@ -63,15 +63,15 @@
     </li>
 
     <!-- Inventarios (Administrador y Empleado) -->
-    <li class="nav-item">
-      <a class="nav-link"
-         href="${pageContext.request.contextPath}/InventarioServlet"
-         draggable="false"
-         target="contentFrame">
-        <i class="bi bi-box-seam"></i> Inventarios
-      </a>
-    </li>
 
+<li class="nav-item">
+  <a class="nav-link"
+     href="${pageContext.request.contextPath}/InventarioServlet?accion=listar"
+     draggable="false"
+     target="contentFrame">
+    <i class="bi bi-box-seam"></i> Inventarios
+  </a>
+</li>
     <!-- Salidas (Administrador y Empleado) -->
     <li class="nav-item">
       <a class="nav-link"
@@ -91,6 +91,11 @@
         <i class="bi bi-receipt"></i> Notas de Venta
       </a>
     </li>
+    <li class="nav-item">
+  <a class="nav-link" href="${ctx}/NotaVentaServlet?accion=listar">
+    <i class="bi bi-receipt"></i> Notas
+  </a>
+</li>
 
   </ul>
 </nav>

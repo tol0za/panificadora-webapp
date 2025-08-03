@@ -1,15 +1,13 @@
 package dao;
 
-import modelo.Salida;
-import java.sql.*;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 import conexion.Conexion;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.List;
-import java.util.ArrayList;
+import modelo.CatalogoEmpaque;
+import modelo.Salida;
+
+import java.sql.*;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.*;
 
 public class SalidaDAO {
     private Connection conn;
@@ -44,15 +42,12 @@ public class SalidaDAO {
                 s.setIdRepartidor(rs.getInt("id_repartidor"));
                 s.setIdEmpaque(rs.getInt("id_empaque"));
                 s.setCantidad(rs.getInt("cantidad"));
-
                 Timestamp ts = rs.getTimestamp("fecha_distribucion");
                 s.setFechaDistribucion(ts.toLocalDateTime());
-                s.setFechaDistribucionDate(ts); // Para JSTL
-
+                s.setFechaDistribucionDate(ts);
                 s.setNombreRepartidor(rs.getString("nombre_repartidor"));
                 s.setApellidoRepartidor(rs.getString("apellido_repartidor"));
                 s.setNombreEmpaque(rs.getString("nombre_empaque"));
-
                 lista.add(s);
             }
         }
@@ -118,7 +113,6 @@ public class SalidaDAO {
         return lista;
     }
 
-    // ELIMINAR UN ARTÍCULO INDIVIDUAL (detalle múltiple)
     public void eliminarSalida(int idDistribucion) throws SQLException {
         String sql = "DELETE FROM distribucion WHERE id_distribucion = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -127,7 +121,6 @@ public class SalidaDAO {
         }
     }
 
-    // ELIMINAR TODOS LOS ARTÍCULOS DE UN REPARTIDOR EN UNA FECHA
     public void eliminarSalidaPorRepartidorYFecha(int idRepartidor, String fecha) throws SQLException {
         String sql = "DELETE FROM distribucion WHERE id_repartidor = ? AND DATE(fecha_distribucion) = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -172,7 +165,7 @@ public class SalidaDAO {
             ps.executeUpdate();
         }
     }
-    // ✅ NUEVO MÉTODO: Obtener empaques con stock actual por repartidor
+
     public List<Map<String, Object>> obtenerEmpaquesPorRepartidor(int idRepartidor) throws SQLException {
         List<Map<String, Object>> lista = new ArrayList<>();
         String sql = """
@@ -200,6 +193,44 @@ public class SalidaDAO {
                     fila.put("precio_unitario", rs.getBigDecimal("precio_unitario"));
                     fila.put("stock", rs.getInt("stock"));
                     lista.add(fila);
+                }
+            }
+        }
+        return lista;
+    }
+
+    public LocalDate obtenerFechaUltimaSalida(int idRepartidor) throws SQLException {
+        String sql = "SELECT MAX(fecha_distribucion) AS fecha FROM distribucion WHERE id_repartidor = ?";
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, idRepartidor);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next() && rs.getDate("fecha") != null) {
+                    return rs.getDate("fecha").toLocalDate();
+                }
+            }
+        }
+        return null;
+    }
+
+    public List<CatalogoEmpaque> obtenerEmpaquesConStockPorRepartidorYFecha(int idRepartidor, LocalDate fecha) throws SQLException {
+        List<CatalogoEmpaque> lista = new ArrayList<>();
+        String sql = """
+            SELECT d.id_empaque, c.nombre_empaque, d.cantidad AS stock, c.precio_unitario
+            FROM distribucion d
+            JOIN catalogo_empaque c ON d.id_empaque = c.id_empaque
+            WHERE d.id_repartidor = ? AND DATE(d.fecha_distribucion) = ? AND d.cantidad > 0
+        """;
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, idRepartidor);
+            stmt.setDate(2, java.sql.Date.valueOf(fecha));
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    CatalogoEmpaque e = new CatalogoEmpaque();
+                    e.setIdEmpaque(rs.getInt("id_empaque"));
+                    e.setNombreEmpaque(rs.getString("nombre_empaque"));
+                    e.setPrecioUnitario(rs.getBigDecimal("precio_unitario"));
+                    e.setStock(rs.getInt("stock"));
+                    lista.add(e);
                 }
             }
         }

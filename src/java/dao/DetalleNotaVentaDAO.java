@@ -4,71 +4,67 @@ import modelo.DetalleNotaVenta;
 import conexion.Conexion;
 
 import java.sql.*;
-import java.util.*;
-import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 
 public class DetalleNotaVentaDAO {
+    private Connection conn;
 
-    public void insertar(DetalleNotaVenta det, int idNota) throws SQLException {
-        String sql = "INSERT INTO detalle_nota_venta (id_nota, id_empaque, cantidad, precio_unitario, subtotal) VALUES (?, ?, ?, ?, ?)";
-        try (Connection conn = Conexion.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, idNota);
-            ps.setInt(2, det.getIdEmpaque());
-            ps.setInt(3, det.getCantidad());
-            ps.setBigDecimal(4, det.getPrecioUnitario());
-            ps.setBigDecimal(5, det.getSubtotal());
-            ps.executeUpdate();
-        }
+    public DetalleNotaVentaDAO() throws SQLException {
+        conn = Conexion.getConnection();
     }
 
-    public void insertarVarios(List<DetalleNotaVenta> detalles, int idNota) throws SQLException {
-        for (DetalleNotaVenta det : detalles) {
-            insertar(det, idNota);
-        }
-    }
+    // Método principal para obtener detalles con nombre del empaque incluido
+    public List<DetalleNotaVenta> obtenerDetallesPorNota(int idNota) throws SQLException {
+        List<DetalleNotaVenta> detalles = new ArrayList<>();
+        String sql = "SELECT dnv.id_detalle, dnv.id_nota, dnv.id_empaque, e.nombre_empaque, " +
+                     "dnv.cantidad_vendida, dnv.precio_unitario, dnv.merma, " +
+                     "(dnv.cantidad_vendida * dnv.precio_unitario) AS total_linea " +
+                     "FROM detalle_nota_venta dnv " +
+                     "JOIN catalogo_empaque e ON dnv.id_empaque = e.id_empaque " +
+                     "WHERE dnv.id_nota = ?";
 
-    public List<DetalleNotaVenta> listarPorNota(int idNota) throws SQLException {
-        List<DetalleNotaVenta> lista = new ArrayList<>();
-        String sql = "SELECT d.*, e.nombre_empaque FROM detalle_nota_venta d " +
-                     "LEFT JOIN catalogo_empaque e ON d.id_empaque = e.id_empaque " +
-                     "WHERE d.id_nota = ?";
-        try (Connection conn = Conexion.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, idNota);
-            try (ResultSet rs = ps.executeQuery()) {
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, idNota);
+            try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    DetalleNotaVenta det = new DetalleNotaVenta();
-                    det.setIdDetalle(rs.getInt("id_detalle"));
-                    det.setIdNota(rs.getInt("id_nota"));
-                    det.setIdEmpaque(rs.getInt("id_empaque"));
-                    det.setCantidad(rs.getInt("cantidad"));
-                    det.setPrecioUnitario(rs.getBigDecimal("precio_unitario"));
-                    det.setSubtotal(rs.getBigDecimal("subtotal"));
-                    det.setNombreEmpaque(rs.getString("nombre_empaque"));
-                    lista.add(det);
+                    DetalleNotaVenta detalle = new DetalleNotaVenta();
+                    detalle.setIdDetalle(rs.getInt("id_detalle"));
+                    detalle.setIdNotaVenta(rs.getInt("id_nota"));
+                    detalle.setIdEmpaque(rs.getInt("id_empaque"));
+                    detalle.setNombreEmpaque(rs.getString("nombre_empaque"));
+                    detalle.setCantidadVendida(rs.getInt("cantidad_vendida"));
+                    detalle.setPrecioUnitario(rs.getDouble("precio_unitario"));
+                    detalle.setMerma(rs.getInt("merma"));
+                    detalle.setTotalLinea(rs.getDouble("total_linea"));
+                    detalles.add(detalle);
+                }
+            }
+        }
+        return detalles;
+    }
+
+    // Método alternativo simple sin nombre_empaque (si se requiere sin JOIN)
+    public List<DetalleNotaVenta> buscarPorNota(int idNota) throws SQLException {
+        List<DetalleNotaVenta> lista = new ArrayList<>();
+        String sql = "SELECT id_empaque, cantidad_vendida, merma, precio_unitario, " +
+                     "(cantidad_vendida * precio_unitario) AS total_linea " +
+                     "FROM detalle_nota_venta WHERE id_nota = ?";
+
+        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, idNota);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    DetalleNotaVenta detalle = new DetalleNotaVenta();
+                    detalle.setIdEmpaque(rs.getInt("id_empaque"));
+                    detalle.setCantidadVendida(rs.getInt("cantidad_vendida"));
+                    detalle.setMerma(rs.getInt("merma"));
+                    detalle.setPrecioUnitario(rs.getDouble("precio_unitario"));
+                    detalle.setTotalLinea(rs.getDouble("total_linea"));
+                    lista.add(detalle);
                 }
             }
         }
         return lista;
-    }
-
-    public void eliminarPorNota(int idNota) throws SQLException {
-        String sql = "DELETE FROM detalle_nota_venta WHERE id_nota = ?";
-        try (Connection conn = Conexion.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, idNota);
-            ps.executeUpdate();
-        }
-    }
-
-    // Si necesitas eliminar un solo detalle:
-    public void eliminarPorId(int idDetalle) throws SQLException {
-        String sql = "DELETE FROM detalle_nota_venta WHERE id_detalle = ?";
-        try (Connection conn = Conexion.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, idDetalle);
-            ps.executeUpdate();
-        }
     }
 }

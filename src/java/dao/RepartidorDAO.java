@@ -95,4 +95,23 @@ public class RepartidorDAO {
         }
         return lista;
     }
+    
+    public List<Repartidor> findAll() throws SQLException {
+    List<Repartidor> lista = new ArrayList<>();
+    String sql = "SELECT * FROM repartidores";
+    try (Connection conn = Conexion.getConnection();
+         PreparedStatement stmt = conn.prepareStatement(sql);
+         ResultSet rs = stmt.executeQuery()) {
+        while (rs.next()) {
+            Repartidor r = new Repartidor();
+            r.setIdRepartidor(rs.getInt("id_repartidor"));
+            r.setNombreRepartidor(rs.getString("nombre_repartidor"));
+            r.setApellidoRepartidor(rs.getString("apellido_repartidor"));
+            r.setTelefono(rs.getString("telefono"));
+            lista.add(r);
+        }
+    }
+    return lista;
+}
+
 }

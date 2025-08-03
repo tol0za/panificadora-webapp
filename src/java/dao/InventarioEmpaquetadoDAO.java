@@ -1,8 +1,6 @@
 package dao;
-
 import conexion.Conexion;
 import modelo.InventarioEmpaquetado;
-
 import java.sql.*;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -21,12 +19,9 @@ public class InventarioEmpaquetadoDAO {
         String sql = "SELECT i.*, c.nombre_empaque FROM inventario_empaquetado i " +
                      "JOIN catalogo_empaque c ON i.id_empaque = c.id_empaque " +
                      "ORDER BY i.fecha DESC";
-
         List<InventarioEmpaquetado> lista = new ArrayList<>();
-
         try (PreparedStatement ps = con.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
-
             while (rs.next()) {
                 InventarioEmpaquetado ie = new InventarioEmpaquetado();
                 ie.setIdInventario(rs.getInt("id_inventario"));
@@ -35,7 +30,6 @@ public class InventarioEmpaquetadoDAO {
                 ie.setCantidad(rs.getInt("cantidad"));
                 ie.setMotivo(rs.getString("motivo"));
                 ie.setCantidadActual(rs.getInt("cantidad_actual"));
-
                 Timestamp timestamp = rs.getTimestamp("fecha");
                 if (timestamp != null) {
                     ie.setFecha(timestamp.toLocalDateTime());
@@ -51,14 +45,12 @@ public class InventarioEmpaquetadoDAO {
         String sqlInsert = "INSERT INTO inventario_empaquetado (id_empaque, cantidad, fecha, motivo, cantidad_actual) " +
                            "VALUES (?, ?, ?, ?, ?)";
         con.setAutoCommit(false);
-
         try (PreparedStatement psInsert = con.prepareStatement(sqlInsert)) {
             psInsert.setInt(1, movimiento.getIdEmpaque());
             psInsert.setInt(2, movimiento.getCantidad());
             psInsert.setTimestamp(3, Timestamp.valueOf(movimiento.getFecha()));
             psInsert.setString(4, movimiento.getMotivo());
             psInsert.setInt(5, movimiento.getCantidadActual());
-
             psInsert.executeUpdate();
             con.commit();
         } catch (SQLException e) {
@@ -69,7 +61,6 @@ public class InventarioEmpaquetadoDAO {
         }
     }
 
-    /** Stock real basado en último movimiento */
     public int obtenerCantidadActual(int idEmpaque) throws SQLException {
         String sql = "SELECT cantidad_actual FROM inventario_empaquetado WHERE id_empaque = ? ORDER BY fecha DESC LIMIT 1";
         try (PreparedStatement ps = con.prepareStatement(sql)) {
@@ -80,7 +71,6 @@ public class InventarioEmpaquetadoDAO {
         }
     }
 
-    // --- Métodos adicionales útiles ---
     public BigDecimal obtenerPrecioUnitario(int idEmpaque) throws SQLException {
         String sql = "SELECT precio_unitario FROM catalogo_empaque WHERE id_empaque = ?";
         try (PreparedStatement ps = con.prepareStatement(sql)) {
@@ -107,15 +97,73 @@ public class InventarioEmpaquetadoDAO {
             ps.executeUpdate();
         }
     }
+
     public int obtenerStockActual(int idEmpaque) throws SQLException {
-    String sql = "SELECT cantidad_actual FROM inventario_empaquetado WHERE id_empaque = ? ORDER BY fecha DESC LIMIT 1";
-    try (PreparedStatement stmt = con.prepareStatement(sql)) {
-        stmt.setInt(1, idEmpaque);
-        ResultSet rs = stmt.executeQuery();
-        if (rs.next()) {
-            return rs.getInt("cantidad_actual");
+        String sql = "SELECT cantidad_actual FROM inventario_empaquetado WHERE id_empaque = ? ORDER BY fecha DESC LIMIT 1";
+        try (PreparedStatement stmt = con.prepareStatement(sql)) {
+            stmt.setInt(1, idEmpaque);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt("cantidad_actual");
+            }
+        }
+        return 0;
+    }
+
+    public int obtenerCantidadActualPorRepartidorYEmpaque(int idRepartidor, int idEmpaque) throws SQLException {
+        String sql = "SELECT cantidad_actual FROM inventario_empaquetado " +
+                     "WHERE id_repartidor = ? AND id_empaque = ? " +
+                     "ORDER BY fecha DESC LIMIT 1";
+        try (Connection conn = Conexion.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, idRepartidor);
+            stmt.setInt(2, idEmpaque);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) return rs.getInt("cantidad_actual");
+            }
+        }
+        return 0;
+    }
+
+    public List<InventarioEmpaquetado> obtenerPorDistribucion(int idDistribucion) throws SQLException {
+        List<InventarioEmpaquetado> lista = new ArrayList<>();
+        String sql = "SELECT * FROM inventario_empaquetado WHERE id_distribucion = ? ORDER BY id_empaque";
+        try (PreparedStatement stmt = con.prepareStatement(sql)) {
+            stmt.setInt(1, idDistribucion);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    InventarioEmpaquetado inv = new InventarioEmpaquetado();
+                    inv.setIdInventario(rs.getInt("id_inventario"));
+                    inv.setIdDistribucion(rs.getInt("id_distribucion"));
+                    inv.setIdEmpaque(rs.getInt("id_empaque"));
+                    inv.setCantidadActual(rs.getInt("cantidad_actual"));
+                    lista.add(inv);
+                }
+            }
+        }
+        return lista;
+    }
+
+    public void actualizarStockDespuesVenta(int idDistribucion, int idEmpaque, int cantidadVendida, int merma) throws SQLException {
+        String sql = "UPDATE inventario_empaquetado SET cantidad_actual = cantidad_actual - ? WHERE id_distribucion = ? AND id_empaque = ?";
+        try (PreparedStatement stmt = con.prepareStatement(sql)) {
+            int totalDescontar = cantidadVendida + merma;
+            stmt.setInt(1, totalDescontar);
+            stmt.setInt(2, idDistribucion);
+            stmt.setInt(3, idEmpaque);
+            stmt.executeUpdate();
         }
     }
-    return 0;
-}
+
+    public void registrarMovimientoSalida(int idDistribucion, int idEmpaque, int cantidad, int cantidadFinal) throws SQLException {
+        String sql = "INSERT INTO inventario_empaquetado (id_empaque, cantidad, fecha, motivo, cantidad_actual, id_distribucion) " +
+                     "VALUES (?, ?, NOW(), 'Salida de Mercancia', ?, ?)";
+        try (PreparedStatement stmt = con.prepareStatement(sql)) {
+            stmt.setInt(1, idEmpaque);
+            stmt.setInt(2, cantidad);
+            stmt.setInt(3, cantidadFinal);
+            stmt.setInt(4, idDistribucion);
+            stmt.executeUpdate();
+        }
+    }
 }
