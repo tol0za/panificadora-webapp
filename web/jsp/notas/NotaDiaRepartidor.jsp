@@ -1,13 +1,12 @@
-<%@ taglib uri="http://java.sun.com/jsp/jstl/core" prefix="c" %>
+<%@ taglib uri="http://java.sun.com/jsp/jstl/core"       prefix="c"  %>
 <%@ taglib uri="http://java.sun.com/jsp/jstl/functions"  prefix="fn" %>
-
 <%@ page contentType="text/html; charset=UTF-8" %>
 <!DOCTYPE html>
 <html>
 <head>
   <title>Notas – ${repartidor.nombreRepartidor}</title>
 
-  <!-- Bootstrap + Bootstrap-icons -->
+  <!-- Bootstrap + icons -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
 </head>
@@ -15,7 +14,7 @@
 <body data-ctx="${pageContext.request.contextPath}">
 <div class="container-fluid py-3">
 
-  <!-- CABECERA -->
+  <!------ CABECERA ------>
   <div class="d-flex justify-content-between align-items-center flex-wrap">
     <h4 class="mb-3">
       Notas de venta – ${repartidor.nombreRepartidor} (${hoy})
@@ -25,25 +24,21 @@
     </button>
   </div>
 
-  <!-- FLASH -->
-
-<c:if test="${not empty sessionScope.flashMsg}">
-    <!-- Determina color: rojo si contiene “Stock insuficiente” o “Error” -->
+  <!------ FLASH (verde / rojo) ------>
+  <c:if test="${not empty sessionScope.flashMsg}">
     <c:set var="alertClass"
            value="${fn:contains(sessionScope.flashMsg,'Stock insuficiente')
                     or fn:contains(sessionScope.flashMsg,'Error')
                       ? 'alert-danger'
-                      : 'alert-success'}" />
-
+                      : 'alert-success'}"/>
     <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
-        <c:out value="${sessionScope.flashMsg}" escapeXml="false"/>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      <c:out value="${sessionScope.flashMsg}" escapeXml="false"/>
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
-
     <c:remove var="flashMsg" scope="session"/>
-</c:if>
+  </c:if>
 
-  <!-- INVENTARIO DEL REPARTIDOR -->
+  <!------ INVENTARIO DISPONIBLE ------>
   <div class="card card-body mb-4">
     <h6 class="card-title">Inventario disponible</h6>
     <div class="table-responsive">
@@ -64,7 +59,7 @@
     </div>
   </div>
 
-  <!-- LISTA DE NOTAS -->
+  <!------ LISTADO DE NOTAS ------>
   <div class="card card-body">
     <h6 class="card-title">Notas registradas</h6>
     <div class="table-responsive">
@@ -89,14 +84,14 @@
               <td class="text-center">
 
                 <!-- Ver -->
-              <a href="#"
-   class="btn btn-sm btn-outline-info me-1 btn-det"
-   data-idNota="${n.idNotaVenta}"
-   data-folio ="${n.folio}"
-   data-tienda="${n.nombreTienda}"
-   title="Ver detalle">
-  <i class="bi bi-eye"></i>
-</a>
+                <a href="#"
+                   class="btn btn-sm btn-outline-info me-1 btn-det"
+                   data-idnota="${n.idNotaVenta}"
+                   data-folio ="${n.folio}"
+                   data-tienda="${n.nombreTienda}"
+                   title="Ver detalle">
+                  <i class="bi bi-eye"></i>
+                </a>
 
                 <!-- Editar -->
                 <a href="${pageContext.request.contextPath}/NotaVentaServlet?inFrame=1&accion=editarNota&id=${n.idNotaVenta}"
@@ -123,17 +118,17 @@
     </div>
   </div>
 
-  <!-- CERRAR RUTA -->
+  <!------ BOTONES CERRAR / REABRIR RUTA ------>
   <button class="btn btn-warning mt-4"
           onclick="cerrarRuta(${repartidor.idRepartidor})">
     Cerrar ruta y devolver sobrante
   </button>
-      <!-- NUEVO ▸ REABRIR RUTA (solo se muestra si el inventario quedó vacío) -->
+
   <c:if test="${empty inventario}">
     <form class="d-inline" method="post"
           action="${pageContext.request.contextPath}/NotaVentaServlet">
       <input type="hidden" name="inFrame"       value="1"/>
-      <input type="hidden" name="accion"        value="reabrirRuta"/><!-- coincide con ACC_REABRIR_RUTA -->
+      <input type="hidden" name="accion"        value="reabrirRuta"/>
       <input type="hidden" name="id_repartidor" value="${repartidor.idRepartidor}"/>
       <button type="submit"
               class="btn btn-outline-warning mt-4 ms-2"
@@ -144,7 +139,7 @@
   </c:if>
 </div>
 
-<!-- ============ MODAL NUEVA NOTA ============ -->
+<!------ MODAL NUEVA NOTA ------>
 <div id="modalNota" class="modal fade" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg"><div class="modal-content">
     <form id="formNota" action="${pageContext.request.contextPath}/NotaVentaServlet" method="post">
@@ -182,7 +177,9 @@
         <div class="table-responsive mb-2">
           <table id="tblDetalle" class="table table-bordered">
             <thead class="table-light">
-              <tr><th>Empaque</th><th>Vendidas</th><th>Merma</th><th>Subtotal</th><th></th></tr>
+              <tr>
+                <th>Empaque</th><th>Vendidas</th><th>Merma</th><th>Subtotal</th><th></th>
+              </tr>
             </thead>
             <tbody></tbody>
             <tfoot class="table-secondary">
@@ -197,14 +194,19 @@
         </button>
       </div>
 
-      <div class="modal-footer">
+       <div class="modal-footer">
+        <!-- NUEVO botón Cancelar -->
+        <button type="button" class="btn btn-outline-secondary me-auto"
+                data-bs-dismiss="modal">
+          Cancelar
+        </button>
         <button id="btnSave" class="btn btn-primary" disabled>Guardar nota</button>
       </div>
     </form>
   </div></div>
 </div>
 
-<!-- ============ MODAL DETALLE NOTA ============ -->
+<!------ MODAL DETALLE NOTA ------>
 <div id="modalDet" class="modal fade" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg"><div class="modal-content">
     <div class="modal-header">
@@ -235,10 +237,10 @@
   </div></div>
 </div>
 
-<!-- INVENTARIO JSON OCULTO -->
+<!-- JSON inventario para JS -->
 <script id="inventarioJson" type="application/json">${inventarioJson}</script>
 
-<!-- Bootstrap bundle + JS -->
+<!-- Bootstrap bundle + JS del módulo -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="${pageContext.request.contextPath}/static/js/notas.js"></script>
 </body>
