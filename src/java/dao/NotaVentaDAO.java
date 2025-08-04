@@ -81,16 +81,26 @@ public class NotaVentaDAO {
     /**
      * Recalcula y actualiza el total de la nota con la suma de sus detalles.
      */
-    public void actualizarTotal(int idNota) throws SQLException {
-        String sql = "UPDATE notas_venta nv SET nv.total = (\n" +
-                     "  SELECT IFNULL(SUM(dnv.cantidad_vendida * dnv.precio_unitario),0)\n" +
-                     "  FROM detalle_nota_venta dnv WHERE dnv.id_nota = nv.id_nota\n" +
-                     ") WHERE nv.id_nota = ?";
-        try (Connection c = getConn(); PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setInt(1, idNota);
-            ps.executeUpdate();
-        }
+ public void actualizarTotal(int idNota) throws SQLException {
+    String sql = """
+        UPDATE notas_venta n
+        JOIN (
+          SELECT id_nota,
+                 COALESCE(SUM(total_linea),0) AS t
+          FROM detalle_nota_venta
+          WHERE id_nota = ?
+          GROUP BY id_nota
+        ) x ON x.id_nota = n.id_nota
+        SET n.total = x.t
+        WHERE n.id_nota = ?
+    """;
+    try (Connection c = Conexion.getConnection();
+         PreparedStatement ps = c.prepareStatement(sql)) {
+        ps.setInt(1, idNota);
+        ps.setInt(2, idNota);
+        ps.executeUpdate();
     }
+}
 
     /**
      * Devuelve una nota con su total y referencias de nombres (tienda, etc.).

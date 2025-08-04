@@ -15,7 +15,12 @@ public class DetalleNotaVenta {
     private int merma;            // piezas merma
     private double precioUnitario;// precio referenciado de catalogo_empaque
     private double totalLinea;    // calculado (cantidadVendida * precioUnitario)
+    private String nombreEmpaque;          // 🆕
 
+    
+    
+    public String getNombreEmpaque() { return nombreEmpaque; }
+    public void setNombreEmpaque(String n) { this.nombreEmpaque = n; }
     // ---------------- Getters & Setters ------------------
     public int getIdDetalle() {
         return idDetalle;

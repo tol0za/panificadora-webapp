@@ -22,9 +22,9 @@ public class DetalleNotaDAO {
      * Inserta una línea en detalle_nota_venta.
      */
     public void insertar(DetalleNotaVenta d) throws SQLException {
-        String sql = "INSERT INTO detalle_nota_venta " +
-                     "(id_nota, id_distribucion, id_empaque, cantidad_vendida, merma, precio_unitario) " +
-                     "VALUES (?,?,?,?,?,?)";
+       String sql = "INSERT INTO detalle_nota_venta "
+           + "(id_nota,id_distribucion,id_empaque,cantidad_vendida,merma,precio_unitario) "
+           + "VALUES (?,?,?,?,?,?)";
         try (Connection c = getConn(); PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setInt(1, d.getIdNota());
             ps.setInt(2, d.getIdDistribucion());
@@ -32,6 +32,7 @@ public class DetalleNotaDAO {
             ps.setInt(4, d.getCantidadVendida());
             ps.setInt(5, d.getMerma());
             ps.setDouble(6, d.getPrecioUnitario());
+       
             ps.executeUpdate();
         }
     }
@@ -50,21 +51,37 @@ public class DetalleNotaDAO {
     /**
      * Lista detalle de una nota específica.
      */
-    public List<DetalleNotaVenta> listarPorNota(int idNota) throws SQLException {
-        List<DetalleNotaVenta> lista = new ArrayList<>();
-        String sql = "SELECT * FROM detalle_nota_venta WHERE id_nota=?";
-        try (Connection c = getConn(); PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setInt(1, idNota);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    DetalleNotaVenta d = mapRow(rs);
-                    lista.add(d);
-                }
+
+public List<DetalleNotaVenta> listarPorNota(int idNota) throws SQLException {
+    String sql = """
+        SELECT d.*, e.nombre_empaque, d.precio_unitario, d.total_linea
+        FROM detalle_nota_venta d
+        JOIN catalogo_empaque e ON e.id_empaque = d.id_empaque
+        WHERE d.id_nota = ?
+        ORDER BY d.id_detalle
+    """;
+    List<DetalleNotaVenta> list = new ArrayList<>();
+    try (Connection c = Conexion.getConnection();
+         PreparedStatement ps = c.prepareStatement(sql)) {
+        ps.setInt(1, idNota);
+        try (ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                DetalleNotaVenta d = new DetalleNotaVenta();
+                d.setIdDetalle(      rs.getInt("id_detalle"));
+                d.setIdNota(         rs.getInt("id_nota"));
+                d.setIdDistribucion( rs.getInt("id_distribucion"));
+                d.setIdEmpaque(      rs.getInt("id_empaque"));
+                d.setCantidadVendida(rs.getInt("cantidad_vendida"));
+                d.setMerma(          rs.getInt("merma"));
+                d.setPrecioUnitario( rs.getDouble("precio_unitario"));
+                d.setTotalLinea(     rs.getDouble("total_linea"));
+                d.setNombreEmpaque(  rs.getString("nombre_empaque"));
+                list.add(d);
             }
         }
-        return lista;
     }
-
+    return list;
+}
     /* ------------------------------------------------------ */
     private DetalleNotaVenta mapRow(ResultSet rs) throws SQLException {
         DetalleNotaVenta d = new DetalleNotaVenta();

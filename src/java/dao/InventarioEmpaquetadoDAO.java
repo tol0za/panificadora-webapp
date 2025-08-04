@@ -174,7 +174,7 @@ public class InventarioEmpaquetadoDAO {
      */
     public void registrarMovimientoSalida(int idEmpaque, int cantidad, int idDistribucion, int idRepartidor) throws SQLException {
         String sql = "INSERT INTO inventario_empaquetado " +
-                     "(id_empaque, cantidad, tipo_movimiento, id_distribucion, id_repartidor, fecha, cantidad_actual) " +
+                     "(id_empaque, cantidad, motivo, id_distribucion, id_repartidor, fecha, cantidad_actual) " +
                      "VALUES (?, ?, 'SALIDA_VENTA', ?, ?, NOW(), ?)";
         // calculamos nuevo stock actual basado en el último registro
         int nuevoActual = obtenerCantidadActual(idEmpaque) - cantidad;
@@ -193,7 +193,7 @@ public class InventarioEmpaquetadoDAO {
      */
     public void regresarStockGeneral(int idEmpaque, int cantidad) throws SQLException {
         String sql = "INSERT INTO inventario_empaquetado " +
-                     "(id_empaque, cantidad, tipo_movimiento, fecha, cantidad_actual) " +
+                     "(id_empaque, cantidad, motivo, fecha, cantidad_actual) " +
                      "VALUES (?, ?, 'ENTRADA_RETORNO', NOW(), ?)";
         int nuevoActual = obtenerCantidadActual(idEmpaque) + cantidad;
         try (PreparedStatement ps = con.prepareStatement(sql)) {

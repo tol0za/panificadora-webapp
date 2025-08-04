@@ -79,4 +79,8 @@ private String nombreTienda;
     }
     public String getNombreTienda() { return nombreTienda; }
 public void setNombreTienda(String nombreTienda) { this.nombreTienda = nombreTienda; }
+
+public int getIdNota() {              // ← alias para JSP antiguos
+    return idNotaVenta;
+}
 }
