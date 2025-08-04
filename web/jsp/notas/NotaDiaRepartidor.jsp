@@ -120,12 +120,11 @@
       <div class="modal-body">
         <!-- Encabezado nota -->
         <div class="row g-2 mb-3">
-          <div class="col-md-4">
+       <div class="col-md-4">
   <label class="form-label">Folio</label>
   <input required name="folio" id="inpFolio" class="form-control">
-  <div id="folioHelp" class="form-text text-danger d-none">
-    El folio ya existe
-  </div>
+  <div id="folioHelpBad"  class="form-text text-danger  d-none">El folio ya existe</div>
+  <div id="folioHelpGood" class="form-text text-success d-none">Folio disponible ✓</div>
 </div>
           <div class="col-md-8">
             <label class="form-label">Tienda</label>
