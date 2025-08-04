@@ -5,8 +5,11 @@
 <html>
 <head>
   <title>Editar nota</title>
+  <!-- Bootstrap + Bootstrap-icons -->
   <link rel="stylesheet"
         href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
 </head>
 <body data-ctx="${pageContext.request.contextPath}">
 <div class="container py-3">
@@ -60,8 +63,14 @@
                 <fmt:formatNumber value="${d.totalLinea}" type="number"
                                   minFractionDigits="2" maxFractionDigits="2"/>
               </td>
-              <td><button type="button"
-                          class="btn btn-link text-danger p-0">✕</button></td>
+              <td>
+  <button type="button"
+          class="btn btn-sm btn-outline-danger btn-eliminar"
+          title="Eliminar"
+          onclick="return confirm('¿Eliminar nota?');">
+    <i class="bi bi-trash"></i>
+  </button>
+</td>
             </tr>
           </c:forEach>
         </tbody>
