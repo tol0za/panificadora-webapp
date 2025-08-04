@@ -1,4 +1,6 @@
 <%@ taglib uri="http://java.sun.com/jsp/jstl/core" prefix="c" %>
+<%@ taglib uri="http://java.sun.com/jsp/jstl/functions"  prefix="fn" %>
+
 <%@ page contentType="text/html; charset=UTF-8" %>
 <!DOCTYPE html>
 <html>
@@ -24,13 +26,22 @@
   </div>
 
   <!-- FLASH -->
-  <c:if test="${not empty sessionScope.flashMsg}">
-    <div class="alert alert-success alert-dismissible fade show" role="alert">
-      <c:out value="${sessionScope.flashMsg}" escapeXml="false"/>
-      <button class="btn-close" data-bs-dismiss="alert"></button>
+
+<c:if test="${not empty sessionScope.flashMsg}">
+    <!-- Determina color: rojo si contiene “Stock insuficiente” o “Error” -->
+    <c:set var="alertClass"
+           value="${fn:contains(sessionScope.flashMsg,'Stock insuficiente')
+                    or fn:contains(sessionScope.flashMsg,'Error')
+                      ? 'alert-danger'
+                      : 'alert-success'}" />
+
+    <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+        <c:out value="${sessionScope.flashMsg}" escapeXml="false"/>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
+
     <c:remove var="flashMsg" scope="session"/>
-  </c:if>
+</c:if>
 
   <!-- INVENTARIO DEL REPARTIDOR -->
   <div class="card card-body mb-4">
@@ -117,6 +128,20 @@
           onclick="cerrarRuta(${repartidor.idRepartidor})">
     Cerrar ruta y devolver sobrante
   </button>
+      <!-- NUEVO ▸ REABRIR RUTA (solo se muestra si el inventario quedó vacío) -->
+  <c:if test="${empty inventario}">
+    <form class="d-inline" method="post"
+          action="${pageContext.request.contextPath}/NotaVentaServlet">
+      <input type="hidden" name="inFrame"       value="1"/>
+      <input type="hidden" name="accion"        value="reabrirRuta"/><!-- coincide con ACC_REABRIR_RUTA -->
+      <input type="hidden" name="id_repartidor" value="${repartidor.idRepartidor}"/>
+      <button type="submit"
+              class="btn btn-outline-warning mt-4 ms-2"
+              onclick="return confirm('¿Reabrir la ruta para seguir capturando notas?');">
+        <i class="bi bi-arrow-counterclockwise"></i> Reabrir ruta
+      </button>
+    </form>
+  </c:if>
 </div>
 
 <!-- ============ MODAL NUEVA NOTA ============ -->

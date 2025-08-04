@@ -6,204 +6,160 @@ import modelo.Salida;
 
 import java.sql.*;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.*;
 
 public class SalidaDAO {
-    private Connection conn;
 
-    public SalidaDAO() throws SQLException {
-        conn = Conexion.getConnection();
+    /* --------------------------------------- */
+    /* Conexión                                */
+    /* --------------------------------------- */
+    private Connection getConn() throws SQLException {
+        return Conexion.getConnection();
     }
 
-    public void registrarSalida(Salida s) throws SQLException {
-        String sql = "INSERT INTO distribucion (id_repartidor, id_empaque, cantidad, fecha_distribucion) VALUES (?, ?, ?, ?)";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, s.getIdRepartidor());
-            ps.setInt(2, s.getIdEmpaque());
-            ps.setInt(3, s.getCantidad());
+    /* ===========================================================
+     * 1. Registrar salida   (ahora retorna el PK generado)
+     * ========================================================= */
+    public int registrarSalida(Salida s) throws SQLException {
+        String sql = """
+            INSERT INTO distribucion
+                   (id_repartidor, id_empaque, cantidad, fecha_distribucion)
+            VALUES (?,?,?,?)
+        """;
+        try (Connection c = getConn();
+             PreparedStatement ps = c.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+
+            ps.setInt      (1, s.getIdRepartidor());
+            ps.setInt      (2, s.getIdEmpaque());
+            ps.setInt      (3, s.getCantidad());
             ps.setTimestamp(4, Timestamp.valueOf(s.getFechaDistribucion()));
             ps.executeUpdate();
+
+            try (ResultSet rs = ps.getGeneratedKeys()) {
+                return rs.next() ? rs.getInt(1) : 0;
+            }
         }
     }
 
+    /* ===========================================================
+     * 2. Listados                                             
+     * ========================================================= */
     public List<Salida> listarSalidas() throws SQLException {
         List<Salida> lista = new ArrayList<>();
-        String sql = "SELECT d.*, r.nombre_repartidor, r.apellido_repartidor, e.nombre_empaque " +
-                "FROM distribucion d " +
-                "JOIN repartidores r ON d.id_repartidor = r.id_repartidor " +
-                "JOIN catalogo_empaque e ON d.id_empaque = e.id_empaque " +
-                "ORDER BY d.fecha_distribucion DESC";
-        try (PreparedStatement ps = conn.prepareStatement(sql);
+        String sql = """
+            SELECT d.*, r.nombre_repartidor, r.apellido_repartidor, e.nombre_empaque
+              FROM distribucion d
+              JOIN repartidores     r ON d.id_repartidor = r.id_repartidor
+              JOIN catalogo_empaque e ON d.id_empaque    = e.id_empaque
+             ORDER BY d.fecha_distribucion DESC
+        """;
+        try (Connection c = getConn();
+             PreparedStatement ps = c.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
-            while (rs.next()) {
-                Salida s = new Salida();
-                s.setIdDistribucion(rs.getInt("id_distribucion"));
-                s.setIdRepartidor(rs.getInt("id_repartidor"));
-                s.setIdEmpaque(rs.getInt("id_empaque"));
-                s.setCantidad(rs.getInt("cantidad"));
-                Timestamp ts = rs.getTimestamp("fecha_distribucion");
-                s.setFechaDistribucion(ts.toLocalDateTime());
-                s.setFechaDistribucionDate(ts);
-                s.setNombreRepartidor(rs.getString("nombre_repartidor"));
-                s.setApellidoRepartidor(rs.getString("apellido_repartidor"));
-                s.setNombreEmpaque(rs.getString("nombre_empaque"));
-                lista.add(s);
-            }
+            while (rs.next()) lista.add(mapRow(rs));
         }
         return lista;
     }
 
     public List<Salida> listarSalidasPorFecha(String fechaISO) throws SQLException {
         List<Salida> lista = new ArrayList<>();
-        String sql = "SELECT d.*, r.nombre_repartidor, r.apellido_repartidor, e.nombre_empaque " +
-                "FROM distribucion d " +
-                "JOIN repartidores r ON d.id_repartidor = r.id_repartidor " +
-                "JOIN catalogo_empaque e ON d.id_empaque = e.id_empaque " +
-                "WHERE DATE(d.fecha_distribucion) = ? " +
-                "ORDER BY r.nombre_repartidor, d.id_empaque";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+        String sql = """
+            SELECT d.*, r.nombre_repartidor, r.apellido_repartidor, e.nombre_empaque
+              FROM distribucion d
+              JOIN repartidores     r ON d.id_repartidor = r.id_repartidor
+              JOIN catalogo_empaque e ON d.id_empaque    = e.id_empaque
+             WHERE DATE(d.fecha_distribucion) = ?
+             ORDER BY r.nombre_repartidor, d.id_empaque
+        """;
+        try (Connection c = getConn();
+             PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setString(1, fechaISO);
-            ResultSet rs = ps.executeQuery();
-            while (rs.next()) {
-                Salida s = new Salida();
-                s.setIdDistribucion(rs.getInt("id_distribucion"));
-                s.setIdRepartidor(rs.getInt("id_repartidor"));
-                s.setIdEmpaque(rs.getInt("id_empaque"));
-                s.setCantidad(rs.getInt("cantidad"));
-                Timestamp ts = rs.getTimestamp("fecha_distribucion");
-                s.setFechaDistribucion(ts.toLocalDateTime());
-                s.setFechaDistribucionDate(ts);
-                s.setNombreRepartidor(rs.getString("nombre_repartidor"));
-                s.setApellidoRepartidor(rs.getString("apellido_repartidor"));
-                s.setNombreEmpaque(rs.getString("nombre_empaque"));
-                lista.add(s);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) lista.add(mapRow(rs));
             }
         }
         return lista;
     }
 
-    public List<Salida> listarSalidasPorRepartidorYFecha(int idRepartidor, String fechaISO) throws SQLException {
+    public List<Salida> listarSalidasPorRepartidorYFecha(int idRep, String fechaISO) throws SQLException {
         List<Salida> lista = new ArrayList<>();
-        String sql = "SELECT d.*, r.nombre_repartidor, r.apellido_repartidor, e.nombre_empaque " +
-                "FROM distribucion d " +
-                "JOIN repartidores r ON d.id_repartidor = r.id_repartidor " +
-                "JOIN catalogo_empaque e ON d.id_empaque = e.id_empaque " +
-                "WHERE d.id_repartidor = ? AND DATE(d.fecha_distribucion) = ? " +
-                "ORDER BY d.id_empaque";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, idRepartidor);
+        String sql = """
+            SELECT d.*, r.nombre_repartidor, r.apellido_repartidor, e.nombre_empaque
+              FROM distribucion d
+              JOIN repartidores     r ON d.id_repartidor = r.id_repartidor
+              JOIN catalogo_empaque e ON d.id_empaque    = e.id_empaque
+             WHERE d.id_repartidor = ? AND DATE(d.fecha_distribucion) = ?
+             ORDER BY d.id_empaque
+        """;
+        try (Connection c = getConn();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, idRep);
             ps.setString(2, fechaISO);
-            ResultSet rs = ps.executeQuery();
-            while (rs.next()) {
-                Salida s = new Salida();
-                s.setIdDistribucion(rs.getInt("id_distribucion"));
-                s.setIdRepartidor(rs.getInt("id_repartidor"));
-                s.setIdEmpaque(rs.getInt("id_empaque"));
-                s.setCantidad(rs.getInt("cantidad"));
-                Timestamp ts = rs.getTimestamp("fecha_distribucion");
-                s.setFechaDistribucion(ts.toLocalDateTime());
-                s.setFechaDistribucionDate(ts);
-                s.setNombreRepartidor(rs.getString("nombre_repartidor"));
-                s.setApellidoRepartidor(rs.getString("apellido_repartidor"));
-                s.setNombreEmpaque(rs.getString("nombre_empaque"));
-                lista.add(s);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) lista.add(mapRow(rs));
             }
         }
         return lista;
     }
 
-    public void eliminarSalida(int idDistribucion) throws SQLException {
-        String sql = "DELETE FROM distribucion WHERE id_distribucion = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, idDistribucion);
-            ps.executeUpdate();
-        }
-    }
-
-    public void eliminarSalidaPorRepartidorYFecha(int idRepartidor, String fecha) throws SQLException {
-        String sql = "DELETE FROM distribucion WHERE id_repartidor = ? AND DATE(fecha_distribucion) = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, idRepartidor);
-            ps.setString(2, fecha);
-            ps.executeUpdate();
-        }
-    }
-
+    /* ===========================================================
+     * 3. CRUD individual                                       
+     * ========================================================= */
     public Salida buscarPorId(int idDistribucion) throws SQLException {
-        String sql = "SELECT d.*, r.nombre_repartidor, r.apellido_repartidor, e.nombre_empaque " +
-                "FROM distribucion d " +
-                "JOIN repartidores r ON d.id_repartidor = r.id_repartidor " +
-                "JOIN catalogo_empaque e ON d.id_empaque = e.id_empaque " +
-                "WHERE d.id_distribucion = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+        String sql = """
+            SELECT d.*, r.nombre_repartidor, r.apellido_repartidor, e.nombre_empaque
+              FROM distribucion d
+              JOIN repartidores     r ON d.id_repartidor = r.id_repartidor
+              JOIN catalogo_empaque e ON d.id_empaque    = e.id_empaque
+             WHERE d.id_distribucion = ?
+        """;
+        try (Connection c = getConn();
+             PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setInt(1, idDistribucion);
-            ResultSet rs = ps.executeQuery();
-            if (rs.next()) {
-                Salida s = new Salida();
-                s.setIdDistribucion(rs.getInt("id_distribucion"));
-                s.setIdRepartidor(rs.getInt("id_repartidor"));
-                s.setIdEmpaque(rs.getInt("id_empaque"));
-                s.setCantidad(rs.getInt("cantidad"));
-                Timestamp ts = rs.getTimestamp("fecha_distribucion");
-                s.setFechaDistribucion(ts.toLocalDateTime());
-                s.setFechaDistribucionDate(ts);
-                s.setNombreRepartidor(rs.getString("nombre_repartidor"));
-                s.setApellidoRepartidor(rs.getString("apellido_repartidor"));
-                s.setNombreEmpaque(rs.getString("nombre_empaque"));
-                return s;
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? mapRow(rs) : null;
             }
         }
-        return null;
     }
 
     public void actualizarSalida(Salida s) throws SQLException {
-        String sql = "UPDATE distribucion SET cantidad=? WHERE id_distribucion=?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+        String sql = "UPDATE distribucion SET cantidad = ? WHERE id_distribucion = ?";
+        try (Connection c = getConn();
+             PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setInt(1, s.getCantidad());
             ps.setInt(2, s.getIdDistribucion());
             ps.executeUpdate();
         }
     }
 
-    public List<Map<String, Object>> obtenerEmpaquesPorRepartidor(int idRepartidor) throws SQLException {
-        List<Map<String, Object>> lista = new ArrayList<>();
-        String sql = """
-            SELECT d.id_empaque, e.nombre_empaque, e.precio_unitario,
-                   COALESCE(i.cantidad_actual, 0) AS stock
-            FROM distribucion d
-            INNER JOIN catalogo_empaque e ON d.id_empaque = e.id_empaque
-            LEFT JOIN (
-                SELECT id_empaque, cantidad_actual
-                FROM inventario_empaquetado
-                WHERE id_repartidor = ?
-                ORDER BY fecha DESC
-            ) i ON i.id_empaque = d.id_empaque
-            WHERE d.id_repartidor = ?
-            GROUP BY d.id_empaque
-        """;
-        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1, idRepartidor);
-            stmt.setInt(2, idRepartidor);
-            try (ResultSet rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    Map<String, Object> fila = new HashMap<>();
-                    fila.put("id_empaque", rs.getInt("id_empaque"));
-                    fila.put("nombre_empaque", rs.getString("nombre_empaque"));
-                    fila.put("precio_unitario", rs.getBigDecimal("precio_unitario"));
-                    fila.put("stock", rs.getInt("stock"));
-                    lista.add(fila);
-                }
-            }
+    public void eliminarSalida(int idDistribucion) throws SQLException {
+        try (Connection c = getConn();
+             PreparedStatement ps = c.prepareStatement(
+                     "DELETE FROM distribucion WHERE id_distribucion = ?")) {
+            ps.setInt(1, idDistribucion);
+            ps.executeUpdate();
         }
-        return lista;
     }
 
-    public LocalDate obtenerFechaUltimaSalida(int idRepartidor) throws SQLException {
+    public void eliminarSalidaPorRepartidorYFecha(int idRep, String fecha) throws SQLException {
+        try (Connection c = getConn();
+             PreparedStatement ps = c.prepareStatement(
+                     "DELETE FROM distribucion WHERE id_repartidor = ? AND DATE(fecha_distribucion) = ?")) {
+            ps.setInt(1, idRep);
+            ps.setString(2, fecha);
+            ps.executeUpdate();
+        }
+    }
+
+    /* ===========================================================
+     * 4. Utilidades varias                                    
+     * ========================================================= */
+    public LocalDate obtenerFechaUltimaSalida(int idRep) throws SQLException {
         String sql = "SELECT MAX(fecha_distribucion) AS fecha FROM distribucion WHERE id_repartidor = ?";
-        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1, idRepartidor);
-            try (ResultSet rs = stmt.executeQuery()) {
+        try (Connection c = getConn();
+             PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setInt(1, idRep);
+            try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next() && rs.getDate("fecha") != null) {
                     return rs.getDate("fecha").toLocalDate();
                 }
@@ -212,28 +168,69 @@ public class SalidaDAO {
         return null;
     }
 
-    public List<CatalogoEmpaque> obtenerEmpaquesConStockPorRepartidorYFecha(int idRepartidor, LocalDate fecha) throws SQLException {
-        List<CatalogoEmpaque> lista = new ArrayList<>();
-        String sql = """
-            SELECT d.id_empaque, c.nombre_empaque, d.cantidad AS stock, c.precio_unitario
-            FROM distribucion d
-            JOIN catalogo_empaque c ON d.id_empaque = c.id_empaque
-            WHERE d.id_repartidor = ? AND DATE(d.fecha_distribucion) = ? AND d.cantidad > 0
-        """;
-        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setInt(1, idRepartidor);
-            stmt.setDate(2, java.sql.Date.valueOf(fecha));
-            try (ResultSet rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    CatalogoEmpaque e = new CatalogoEmpaque();
-                    e.setIdEmpaque(rs.getInt("id_empaque"));
-                    e.setNombreEmpaque(rs.getString("nombre_empaque"));
-                    e.setPrecioUnitario(rs.getBigDecimal("precio_unitario"));
-                    e.setStock(rs.getInt("stock"));
-                    lista.add(e);
-                }
+    /* Empaques/stock para formularios AJAX -------------------- */
+    
+public List<CatalogoEmpaque> obtenerEmpaquesConStockPorRepartidorYFecha(
+        int idRepartidor, LocalDate fecha) throws SQLException {
+
+    List<CatalogoEmpaque> lista = new ArrayList<>();
+    String sql = """
+        SELECT d.id_empaque, c.nombre_empaque,
+               SUM(d.cantidad) AS stock, c.precio_unitario
+          FROM distribucion d
+          JOIN catalogo_empaque c ON d.id_empaque = c.id_empaque
+         WHERE d.id_repartidor = ?
+           AND DATE(d.fecha_distribucion) = ?
+         GROUP BY d.id_empaque
+    """;
+    try (Connection c = getConn();
+         PreparedStatement ps = c.prepareStatement(sql)) {
+
+        ps.setInt(1, idRepartidor);
+        /* ⚠️ usa plenamente cualificado java.sql.Date */
+        ps.setDate(2, java.sql.Date.valueOf(fecha));
+
+        try (ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                CatalogoEmpaque e = new CatalogoEmpaque();
+                e.setIdEmpaque     (rs.getInt("id_empaque"));
+                e.setNombreEmpaque (rs.getString("nombre_empaque"));
+                e.setPrecioUnitario(rs.getBigDecimal("precio_unitario"));
+                e.setStock         (rs.getInt("stock"));
+                lista.add(e);
             }
         }
-        return lista;
+    }
+    return lista;
+}
+    /* ===========================================================
+     * 5. Mappers                                               
+     * ========================================================= */
+    private Salida mapRow(ResultSet rs) throws SQLException {
+        Salida s = new Salida();
+        s.setIdDistribucion   (rs.getInt("id_distribucion"));
+        s.setIdRepartidor     (rs.getInt("id_repartidor"));
+        s.setIdEmpaque        (rs.getInt("id_empaque"));
+        s.setCantidad         (rs.getInt("cantidad"));
+
+        Timestamp ts = rs.getTimestamp("fecha_distribucion");
+        s.setFechaDistribucion     (ts.toLocalDateTime());
+        s.setFechaDistribucionDate (ts);
+
+        // alias de joins
+        if (hasColumn(rs, "nombre_repartidor"))
+            s.setNombreRepartidor (rs.getString("nombre_repartidor"));
+        if (hasColumn(rs, "apellido_repartidor"))
+            s.setApellidoRepartidor(rs.getString("apellido_repartidor"));
+        if (hasColumn(rs, "nombre_empaque"))
+            s.setNombreEmpaque    (rs.getString("nombre_empaque"));
+        return s;
+    }
+
+    private boolean hasColumn(ResultSet rs, String col) {
+        try {
+            rs.findColumn(col);
+            return true;
+        } catch (SQLException ignored) { return false; }
     }
 }

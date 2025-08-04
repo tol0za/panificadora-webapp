@@ -71,61 +71,89 @@ public class DistribucionDAO {
     /**
      * Devuelve los repartidores que registraron al menos una salida en la fecha dada.
      */
-    public List<DistribucionResumen> repartidoresConSalida(LocalDate fecha) throws SQLException {
-        List<DistribucionResumen> lista = new ArrayList<>();
-        String sql = "SELECT MIN(d.id_distribucion) AS id_distribucion, " +
-                     "       r.id_repartidor, r.nombre_repartidor " +
-                     "FROM distribucion d " +
-                     "JOIN repartidores r ON r.id_repartidor = d.id_repartidor " +
-                     "WHERE DATE(d.fecha_distribucion) = ? " +
-                     "GROUP BY r.id_repartidor, r.nombre_repartidor";
-        try (Connection c = getConn();
-             PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setDate(1, Date.valueOf(fecha));
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    lista.add(new DistribucionResumen(
-                            rs.getInt("id_distribucion"),
-                            rs.getInt("id_repartidor"),
-                            rs.getString("nombre_repartidor")));
-                }
+public List<DistribucionResumen> repartidoresConSalida(LocalDate fecha) throws SQLException {
+    List<DistribucionResumen> lista = new ArrayList<>();
+    String sql = """
+        SELECT MIN(d.id_distribucion)  AS id_distribucion,
+               r.id_repartidor,
+               r.nombre_repartidor
+          FROM distribucion d
+          JOIN repartidores r ON r.id_repartidor = d.id_repartidor
+         WHERE d.fecha_distribucion >= ?           -- 00:00 del día buscado
+           AND d.fecha_distribucion <  ?           -- 00:00 del día siguiente
+         GROUP BY r.id_repartidor, r.nombre_repartidor
+    """;
+    try (Connection c = getConn();
+         PreparedStatement ps = c.prepareStatement(sql)) {
+        ps.setTimestamp(1, Timestamp.valueOf(fecha.atStartOfDay()));
+        ps.setTimestamp(2, Timestamp.valueOf(fecha.plusDays(1).atStartOfDay()));
+        try (ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                lista.add(new DistribucionResumen(
+                        rs.getInt("id_distribucion"),
+                        rs.getInt("id_repartidor"),
+                        rs.getString("nombre_repartidor")));
             }
         }
-        return lista;
     }
+    return lista;
+}
 
-    /**
-     * Obtiene el inventario pendiente (restante>0) de un repartidor en la fecha dada.
-     */
-    public List<InventarioDTO> inventarioPendiente(int idRepartidor, LocalDate fecha) throws SQLException {
-        List<InventarioDTO> lista = new ArrayList<>();
-        String sql = "SELECT d.id_distribucion, d.id_empaque, ce.nombre_empaque, ce.precio_unitario, " +
-                     "       (d.cantidad - IFNULL(ir.cantidad_vendida,0) - IFNULL(ir.cantidad_mermada,0)) AS restante " +
-                     "FROM distribucion d " +
-                     "JOIN catalogo_empaque ce ON ce.id_empaque = d.id_empaque " +
-                     "LEFT JOIN inventario_repartidor ir " +
-                     "  ON ir.id_repartidor = d.id_repartidor AND ir.id_empaque = d.id_empaque " +
-                     "WHERE d.id_repartidor = ? AND DATE(d.fecha_distribucion) = ? " +
-                     "HAVING restante > 0";
-        try (Connection c = getConn();
-             PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setInt(1, idRepartidor);
-            ps.setDate(2, Date.valueOf(fecha));
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    lista.add(new InventarioDTO(
-                            rs.getInt("id_distribucion"),
-                            rs.getInt("id_empaque"),
-                            rs.getString("nombre_empaque"),
-                            rs.getDouble("precio_unitario"),
-                            rs.getInt("restante")));
-                }
+   
+
+    /* -------/**
+ * Inventario pendiente (restante > 0) del repartidor en la fecha dada.
+ * Usa rango [00:00 del día, 00:00 del día + 1] y,
+ * si existe columna cantidad_restante en inventario_repartidor,
+ * la toma como referencia para evitar duplicar retornos.
+ */
+public List<InventarioDTO> inventarioPendiente(int idRepartidor, LocalDate fecha)
+        throws SQLException {
+
+    List<InventarioDTO> lista = new ArrayList<>();
+
+    String sql = """
+        SELECT d.id_distribucion,
+               d.id_empaque,
+               ce.nombre_empaque,
+               ce.precio_unitario,
+               /* si ya hay cantidad_restante en inventario_repartidor la usamos */
+               COALESCE(ir.cantidad_restante,
+                        d.cantidad
+                        - IFNULL(ir.cantidad_vendida,0)
+                        - IFNULL(ir.cantidad_mermada,0)) AS restante
+          FROM distribucion d
+          JOIN catalogo_empaque ce
+                ON ce.id_empaque = d.id_empaque
+          LEFT JOIN inventario_repartidor ir
+                ON ir.id_repartidor = d.id_repartidor
+               AND ir.id_empaque    = d.id_empaque
+         WHERE d.id_repartidor = ?
+           AND d.fecha_distribucion >= ?
+           AND d.fecha_distribucion <  ?
+         HAVING restante > 0
+    """;
+
+    try (Connection c = getConn();
+         PreparedStatement ps = c.prepareStatement(sql)) {
+
+        ps.setInt(1, idRepartidor);
+        ps.setTimestamp(2, Timestamp.valueOf(fecha.atStartOfDay()));             // 00:00 hoy
+        ps.setTimestamp(3, Timestamp.valueOf(fecha.plusDays(1).atStartOfDay())); // 00:00 mañana
+
+        try (ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                lista.add(new InventarioDTO(
+                        rs.getInt("id_distribucion"),
+                        rs.getInt("id_empaque"),
+                        rs.getString("nombre_empaque"),
+                        rs.getDouble("precio_unitario"),
+                        rs.getInt("restante")));
             }
         }
-        return lista;
     }
-
-    /* ----------------------------------------------------- */
+    return lista;
+}
     /*  Helper de mapeo                                      */
     /* ----------------------------------------------------- */
     private Distribucion mapRow(ResultSet rs) throws SQLException {

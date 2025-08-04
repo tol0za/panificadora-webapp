@@ -21,22 +21,39 @@ public class DetalleNotaDAO {
     /**
      * Inserta una línea en detalle_nota_venta.
      */
-    public void insertar(DetalleNotaVenta d) throws SQLException {
-       String sql = "INSERT INTO detalle_nota_venta "
-           + "(id_nota,id_distribucion,id_empaque,cantidad_vendida,merma,precio_unitario) "
-           + "VALUES (?,?,?,?,?,?)";
-        try (Connection c = getConn(); PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setInt(1, d.getIdNota());
-            ps.setInt(2, d.getIdDistribucion());
-            ps.setInt(3, d.getIdEmpaque());
-            ps.setInt(4, d.getCantidadVendida());
-            ps.setInt(5, d.getMerma());
-            ps.setDouble(6, d.getPrecioUnitario());
-       
-            ps.executeUpdate();
+ public void insertar(DetalleNotaVenta d) throws SQLException {
+        try (Connection c = Conexion.getConnection()) {
+            insertarInterno(c, List.of(d));     // reutiliza el lote
         }
     }
 
+    /* NUEVO — misma lógica pero recibe varias líneas a la vez       *
+     *       — no rompe quienes aún llamen insertar(DetalleNotaVenta) */
+    public void insertar(List<DetalleNotaVenta> lista) throws SQLException {
+        if (lista == null || lista.isEmpty()) return;
+        try (Connection c = Conexion.getConnection()) {
+            insertarInterno(c, lista);
+        }
+    }
+    
+      private void insertarInterno(Connection c, List<DetalleNotaVenta> lista) throws SQLException {
+        String sql = "INSERT INTO detalle_nota_venta "
+                   + "(id_nota,id_distribucion,id_empaque,cantidad_vendida,merma,precio_unitario)"
+                   + "VALUES (?,?,?,?,?,?)";
+
+        try (PreparedStatement ps = c.prepareStatement(sql)) {
+            for (DetalleNotaVenta d : lista) {
+                ps.setInt   (1, d.getIdNota());
+                ps.setInt   (2, d.getIdDistribucion());
+                ps.setInt   (3, d.getIdEmpaque());
+                ps.setInt   (4, d.getCantidadVendida());
+                ps.setInt   (5, d.getMerma());
+                ps.setDouble(6, d.getPrecioUnitario());
+                ps.addBatch();
+            }
+            ps.executeBatch();          // 🚀 un solo round-trip
+        }
+    }
     /**
      * Elimina todas las líneas de una nota.
      */
