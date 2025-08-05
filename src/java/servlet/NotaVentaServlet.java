@@ -17,6 +17,21 @@ import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
+import com.itextpdf.io.image.ImageDataFactory;
+import com.itextpdf.kernel.colors.ColorConstants;
+import com.itextpdf.kernel.events.PdfDocumentEvent;
+import com.itextpdf.kernel.font.PdfFontFactory;
+import com.itextpdf.kernel.pdf.PdfDocument;
+import com.itextpdf.kernel.pdf.PdfWriter;
+import com.itextpdf.layout.Document;
+import com.itextpdf.layout.borders.Border;  
+import com.itextpdf.layout.borders.SolidBorder;
+import com.itextpdf.layout.element.Cell;
+import com.itextpdf.layout.element.Image;
+import com.itextpdf.layout.element.Paragraph;
+import com.itextpdf.layout.element.Table;
+import com.itextpdf.layout.properties.TextAlignment;
+import com.itextpdf.layout.properties.VerticalAlignment;
 
 /** Controlador principal del módulo de Notas de Venta */
 
@@ -43,7 +58,8 @@ public class NotaVentaServlet extends HttpServlet {
     private static final String ACC_REABRIR_RUTA     = "reabrirRuta";   // ← NUEVO
     private static final String ACC_FOLIO_CHECK      = "folioCheck";
     private static final String ACC_DETALLE_JSON     = "detalleJson";
-
+    
+ private static final String ACC_IMPRIMIR_DIA = "imprimirNotasDia"; // ← igual que en la URL
     /* ============ init ============ */
     @Override public void init() throws ServletException {
         try {
@@ -123,6 +139,8 @@ public class NotaVentaServlet extends HttpServlet {
                 case ACC_ELIMINAR         -> eliminarNota(req,res);
                 case ACC_CERRAR_RUTA      -> cerrarRuta(req,res);
                 case ACC_REABRIR_RUTA     -> reabrirRuta(req,res);     // ← NUEVO
+               
+                case ACC_IMPRIMIR_DIA     -> imprimirNotasDia(req,res); // ← NUEVO
                 default                   -> repartidoresHoy(req,res);
             }
         } catch (SQLException e) {
@@ -166,6 +184,8 @@ public class NotaVentaServlet extends HttpServlet {
         req.setAttribute("repartidor",     repartidorDAO.obtener(idRep));
         req.setAttribute("tiendas",        tiendaDAO.listarTodas());
         req.setAttribute("hoy",            hoy);
+        boolean rutaCerrada = inventario.isEmpty();
+        req.setAttribute("rutaCerrada", rutaCerrada);
         forwardVista(req,res,"jsp/notas/NotaDiaRepartidor.jsp");
     }
 
@@ -422,7 +442,160 @@ invGlobalDAO.registrarMovimientoSalida(
         sb.append('}');
         return sb.toString();
     }
+    
+    
 
+    /* ---------------------------------------------------------------
+ *  Imprime TODAS las notas del día para un repartidor  (iText 7.2.6)
+ *  URL: …/NotaVentaServlet?accion=imprimirNotasDia&id_repartidor=##
+ * ------------------------------------------------------------- */
+private void imprimirNotasDia(HttpServletRequest req,
+                              HttpServletResponse  res)
+        throws ServletException, IOException {
+
+    /* -------- validar parámetros -------- */
+    String repStr = req.getParameter("id_repartidor");
+    if (repStr == null || repStr.isBlank()) {
+        res.sendError(400, "Falta parámetro id_repartidor");
+        return;
+    }
+    int idRep = Integer.parseInt(repStr);
+
+    try {
+        /* -------- obtener todas las notas de HOY -------- */
+        LocalDate hoy = LocalDate.now();
+        List<NotaVenta> notas = notaDAO.listarPorRepartidorYFecha(idRep, hoy);
+        if (notas.isEmpty()) {
+            res.sendError(404, "No hay notas para imprimir");
+            return;
+        }
+
+        /* -------- preparar PDF -------- */
+        res.setContentType("application/pdf");
+        res.setHeader("Content-Disposition",
+                      "inline; filename=notas_rep_" + idRep + "_" + hoy + ".pdf");
+
+        PdfWriter   wr  = new PdfWriter(res.getOutputStream());
+        PdfDocument pdf = new PdfDocument(wr);
+        Document    doc = new Document(pdf);
+
+        /* ---- encabezado genérico una sola vez ---- */
+  Image logo = new Image(ImageDataFactory.create(
+        req.getServletContext().getRealPath("/static/img/logo_pdf.png")))
+        .scaleToFit(90, 90);                     // ajusta tamaño
+
+Paragraph datosEmp = new Paragraph()
+        .add("PANIFICADORA DEL VALLE\n")
+        .add("RFC TOHL841101PZ6\n")
+        .add("Calle Guztavo A Vallejo\n")
+        .add("San Quintín BC\n")
+        .add("Tel. 616-136-7253")
+        .setTextAlignment(TextAlignment.LEFT)    // texto a la IZQ
+        .setBold()
+        .setMargin(0);                           // sin sangrías extra
+
+
+       Table cab = new Table(new float[]{1, 3})          // 50 % / 50 %
+        .useAllAvailableWidth()                   // ↱ ocupa 100 % del ancho
+        .setBorder(Border.NO_BORDER);
+
+Cell cLogo  = new Cell().add(logo)
+        .setBorder(Border.NO_BORDER)
+        .setVerticalAlignment(VerticalAlignment.MIDDLE);   // centra vertical
+
+Cell cTexto = new Cell().add(datosEmp)
+        .setBorder(Border.NO_BORDER)
+        .setTextAlignment(TextAlignment.CENTER)            // ↱ centra horiz.
+        .setVerticalAlignment(VerticalAlignment.MIDDLE);   // centra vertical
+
+        cab.addCell(new Cell().add(logo).setBorder(Border.NO_BORDER));
+        cab.addCell(new Cell().add(datosEmp).setBorder(Border.NO_BORDER));
+        doc.add(cab).add(new Paragraph("\n"));
+
+        /* -------- recorrer notas -------- */
+        double granTotal = 0;
+
+        for (NotaVenta nota : notas) {
+
+            /* título de nota */
+            doc.add(new Paragraph("NOTA DE VENTA  #" + nota.getFolio())
+                        .setTextAlignment(TextAlignment.CENTER)
+                        .setFontSize(12)
+                        .setBold());
+
+            /* datos tienda / hora */
+            doc.add(new Paragraph()
+                    .add("Tienda: ")
+                    .add(tiendaDAO.buscarPorId(nota.getIdTienda()).getNombre())
+                    .add("\nFecha: " + nota.getFechaNota())
+                    .setMarginBottom(6));
+
+            /* detalle */
+            List<DetalleNotaVenta> det =
+                    detalleDAO.listarPorNota(nota.getIdNotaVenta());
+            for (DetalleNotaVenta d : det) {
+                d.setNombreEmpaque(
+                        empaqueDAO.buscarPorId(d.getIdEmpaque()).getNombreEmpaque());
+            }
+
+            Table tbl = new Table(new float[]{5,2,2,2})
+                        .useAllAvailableWidth();
+
+            tbl.addHeaderCell(header("Empaque"));
+            tbl.addHeaderCell(header("Vendidos"));
+            tbl.addHeaderCell(header("Merma"));
+            tbl.addHeaderCell(header("Subtotal"));
+
+            double total = 0;
+            for (DetalleNotaVenta d : det) {
+                tbl.addCell(cell(d.getNombreEmpaque()));
+                tbl.addCell(cell(d.getCantidadVendida()));
+                tbl.addCell(cell(d.getMerma()));
+                tbl.addCell(cell(String.format("$ %.2f", d.getTotalLinea())));
+                total += d.getTotalLinea();
+            }
+            doc.add(tbl);
+
+            doc.add(new Paragraph("Total nota: $ " + String.format("%.2f", total))
+                        .setTextAlignment(TextAlignment.RIGHT)
+                        .setBold()
+                        .setMarginBottom(10));
+
+            granTotal += total;
+
+            /* separador entre notas (salvo la última) */
+            if (nota != notas.get(notas.size()-1)) {
+                doc.add(new Paragraph("\n").setBorderTop(new SolidBorder(0.5f)));
+            }
+        }
+
+        /* ---- total del día ---- */
+        doc.add(new Paragraph("TOTAL DEL DÍA: $ " + String.format("%.2f", granTotal))
+                    .setTextAlignment(TextAlignment.RIGHT)
+                    .setFontSize(13)
+                    .setBold()
+                    .setMarginTop(15));
+
+        doc.close();
+
+    } catch (Exception e) {
+        throw new ServletException("No se pudo generar el PDF", e);
+    }
+}
+
+/* Helpers abreviados */
+private Cell header(String txt){
+    return new Cell().add(new Paragraph(txt))
+                     .setBackgroundColor(ColorConstants.LIGHT_GRAY)
+                     .setBold();
+}
+private Cell cell(Object txt){
+    return new Cell().add(new Paragraph(String.valueOf(txt)));
+}
+
+    
+    
+    
     private List<DetalleNotaVenta> parseDetalleJSON(String json,int idNota){
         List<DetalleNotaVenta> list = new ArrayList<>();
         if (json == null || json.isBlank()) return list;
