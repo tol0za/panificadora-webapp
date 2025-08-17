@@ -92,7 +92,14 @@
       </a>
     </li>
  
-
+<!-- Sección INVENTARIO / DISTRIBUCIÓN -->
+<li class="nav-item">
+  <a class="nav-link d-flex align-items-center"
+     href="${pageContext.request.contextPath}/jsp/distribucion/distribucionList.jsp"
+     target="contentFrame">
+    <i class="bi bi-truck me-2"></i><span>Salidas Distribución</span>
+  </a>
+</li>
   </ul>
 </nav>
 

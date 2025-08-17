@@ -144,11 +144,39 @@ public class SalidaServlet extends HttpServlet {
             } else if ("eliminarSalida".equals(accion)) {
                 /* ... tu código de eliminación original ... */
 
-            } else if ("verDia".equals(accion)) {
-                /* ... tu código original ... */
+            } 
+       
+            // SalidaServlet.java  (dentro de doGet)
+else if ("verDia".equals(accion)) {
+    String fechaStr = request.getParameter("fecha");           // yyyy-MM-dd
 
-            } else if ("verDetalle".equals(accion)) {
-                /* ... tu código original ... */
+    List<Salida> lista = salidaDAO.listarSalidasPorFecha(fechaStr);
+
+    /* Agrupa por repartidor → Map<Integer, List<Salida>> */
+    Map<Integer, List<Salida>> map = new LinkedHashMap<>();
+    for (Salida s : lista) {
+        map.computeIfAbsent(s.getIdRepartidor(),
+                            k -> new ArrayList<>()).add(s);
+    }
+
+    /* usa los mismos nombres que el JSP */
+    request.setAttribute("salidasPorRepartidor", map);
+    request.setAttribute("fechaSeleccionada",     fechaStr);
+
+    request.getRequestDispatcher("/jsp/salidas/salidasDia.jsp")
+           .forward(request, response);
+    return;
+}                  
+            else if ("verDetalle".equals(accion)) {
+                int idR = Integer.parseInt(request.getParameter("idRepartidor"));
+                String fecha = request.getParameter("fecha");
+                List<Salida> detalles = salidaDAO.listarSalidasPorRepartidorYFecha(idR, fecha);
+                String nombreR = detalles.isEmpty() ? ""
+                        : detalles.get(0).getNombreRepartidor() + " " + detalles.get(0).getApellidoRepartidor();
+                request.setAttribute("detalles", detalles);
+                request.setAttribute("nombreRepartidor", nombreR);
+                request.setAttribute("fechaSeleccionada", fecha);
+                request.getRequestDispatcher("/jsp/salidas/salidasPorRepartidor.jsp").forward(request, response);
 
             } else {
                 /* default => listado */
@@ -168,32 +196,85 @@ public class SalidaServlet extends HttpServlet {
     /* POST                                                      */
     /* --------------------------------------------------------- */
     @Override
-    protected void doPost(HttpServletRequest request, HttpServletResponse response)
-            throws ServletException, IOException {
-
+   protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
         String accion = request.getParameter("accion");
 
         if ("eliminarArticulo".equals(accion)) {
-            /* ... tu lógica de eliminar detalle ... */
+            String strId  = request.getParameter("idDistribucion");
+            String strIdR = request.getParameter("idRepartidor");
+            String fecha  = request.getParameter("fecha");
+            if (strId == null || strId.isEmpty()
+             || strIdR == null || strIdR.isEmpty()
+             || fecha == null || fecha.isEmpty()) {
+                request.getSession().setAttribute("mensaje", "Parámetros inválidos para eliminar el artículo.");
+                response.sendRedirect("SalidaServlet?accion=editarMultiple&idRepartidor=" + strIdR + "&fecha=" + fecha);
+                return;
+            }
+            try {
+                salidaDAO.eliminarSalida(Integer.parseInt(strId));
+                request.getSession().setAttribute("mensaje", "Artículo eliminado correctamente.");
+            } catch (SQLException ex) {
+                request.getSession().setAttribute("mensaje", "Error al eliminar artículo: " + ex.getMessage());
+            }
+            response.sendRedirect("SalidaServlet?accion=editarMultiple&idRepartidor=" + strIdR + "&fecha=" + fecha);
             return;
         }
 
         try {
             if ("actualizar".equals(accion)) {
-                /* ... actualizar línea individual ... */
+                int idDist = Integer.parseInt(request.getParameter("idDistribucion"));
+                int cant   = Integer.parseInt(request.getParameter("cantidad"));
+                Salida s   = salidaDAO.buscarPorId(idDist);
+                if (s != null) {
+                    s.setCantidad(cant);
+                    salidaDAO.actualizarSalida(s);
+                }
+                request.getSession().setAttribute("mensaje", "Salida actualizada correctamente.");
+                response.sendRedirect("SalidaServlet");
                 return;
 
             } else if ("actualizarMultiple".equals(accion)) {
-                /* ... actualizar varias líneas ... */
+                String[] ids   = request.getParameterValues("idDistribucion[]");
+                String[] cants = request.getParameterValues("cantidad[]");
+                for (int i = 0; i < ids.length; i++) {
+                    Salida s = salidaDAO.buscarPorId(Integer.parseInt(ids[i]));
+                    if (s != null) {
+                        s.setCantidad(Integer.parseInt(cants[i]));
+                        salidaDAO.actualizarSalida(s);
+                    }
+                }
+                String fecha = request.getParameter("fecha");
+                int idR      = Integer.parseInt(request.getParameter("idRepartidor"));
+                request.getSession().setAttribute("mensaje", "Salida actualizada correctamente.");
+                response.sendRedirect("SalidaServlet?accion=editarMultiple&idRepartidor=" + idR + "&fecha=" + fecha);
                 return;
 
-            } else {                       /* ---------- REGISTRAR NUEVA SALIDA ---------- */
-                registrarSalidas(request, response);
+            } else {
+                int idRepartidor   = Integer.parseInt(request.getParameter("idRepartidor"));
+                String[] empaques  = request.getParameterValues("idEmpaque[]");
+                String[] cantidades= request.getParameterValues("cantidad[]");
+                if (empaques == null || cantidades == null || empaques.length != cantidades.length) {
+                    request.getSession().setAttribute("mensaje", "Error: Debes seleccionar al menos un producto y cantidad.");
+                    response.sendRedirect("SalidaServlet?accion=nuevo");
+                    return;
+                }
+                for (int i = 0; i < empaques.length; i++) {
+                    int idE = Integer.parseInt(empaques[i]);
+                    int c   = Integer.parseInt(cantidades[i]);
+                    if (c <= 0) continue;
+                    Salida s = new Salida();
+                    s.setIdRepartidor(idRepartidor);
+                    s.setIdEmpaque(idE);
+                    s.setCantidad(c);
+                    s.setFechaDistribucion(LocalDateTime.now());
+                    salidaDAO.registrarSalida(s);
+                }
+                request.getSession().setAttribute("mensaje", "Salida registrada correctamente.");
+                response.sendRedirect("SalidaServlet?accion=nuevo");
                 return;
             }
         } catch (Exception e) {
-            request.getSession().setAttribute("mensaje",
-                    "Error al procesar: " + e.getMessage());
+            request.getSession().setAttribute("mensaje", "Error al procesar: " + e.getMessage());
             response.sendRedirect("SalidaServlet");
         }
     }

@@ -210,4 +210,88 @@ public void consumirRestante(int idRep,
         ps.executeUpdate();
     }
 }
+/* ==============================================================
+ *  InventarioRepartidorDAO.java  –  métodos sin duplicar movimiento
+ * ============================================================== */
+
+/* 1.  SUMAR → versión con nuevoStock (4 parámetros) */
+public void sumarInventarioRepartidor(int idRep,
+                                      int idEmp,
+                                      int entrada,
+                                      int nuevoStock) throws SQLException {
+
+    String upd = """
+        UPDATE inventario_repartidor
+           SET cantidad_distribuida = cantidad_distribuida + ?,
+               cantidad_restante    = cantidad_restante    + ?
+         WHERE id_repartidor = ? AND id_empaque = ?
+    """;
+    String ins = """
+        INSERT INTO inventario_repartidor
+               (id_repartidor, id_empaque,
+                cantidad_distribuida, cantidad_restante)
+        VALUES (?,?,?,?)
+    """;
+
+    try (Connection cn = Conexion.getConnection();
+         PreparedStatement psU = cn.prepareStatement(upd);
+         PreparedStatement psI = cn.prepareStatement(ins)) {
+
+        psU.setInt(1, entrada);
+        psU.setInt(2, entrada);
+        psU.setInt(3, idRep);
+        psU.setInt(4, idEmp);
+
+        if (psU.executeUpdate() == 0) {           // no existía fila → insert
+            psI.setInt(1, idRep);
+            psI.setInt(2, idEmp);
+            psI.setInt(3, entrada);
+            psI.setInt(4, entrada);
+            psI.executeUpdate();
+        }
+    }
+
+    /*  ───────────────────────────────────────────────
+     *  Ya NO llamamos a registrarMovimientoSalida(…)
+     *  Esa única inserción la hace DistribucionDAO.
+     *  ─────────────────────────────────────────────── */
 }
+
+/* 2.  SUMAR → sobrecarga legacy (3 parámetros)                 */
+/*     Calcula nuevoStock y delega                              */
+public void sumarInventarioRepartidor(int idRep,
+                                      int idEmp,
+                                      int entrada) throws SQLException {
+
+    InventarioEmpaquetadoDAO invDao = new InventarioEmpaquetadoDAO();
+    int nuevoStock = invDao.restarInventarioBodega(idEmp, entrada);
+
+    /* delega a la versión de 4 parámetros (↑) */
+    sumarInventarioRepartidor(idRep, idEmp, entrada, nuevoStock);
+}
+
+/* 3.  RESTAR (sin cambios, no genera movimiento) */
+public void restarInventarioRepartidor(int idRep,
+                                       int idEmp,
+                                       int cant) throws SQLException {
+
+    String sql = """
+        UPDATE inventario_repartidor
+           SET cantidad_distribuida = cantidad_distribuida - ?,
+               cantidad_restante    = cantidad_restante    - ?
+         WHERE id_repartidor = ? AND id_empaque = ?
+    """;
+
+    try (Connection cn = Conexion.getConnection();
+         PreparedStatement ps = cn.prepareStatement(sql)) {
+
+        ps.setInt(1, cant);
+        ps.setInt(2, cant);
+        ps.setInt(3, idRep);
+        ps.setInt(4, idEmp);
+        ps.executeUpdate();
+    }
+}
+
+}
+

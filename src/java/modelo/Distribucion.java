@@ -1,72 +1,65 @@
 package modelo;
 
+import java.io.Serializable;
 import java.time.LocalDateTime;
 
-public class Distribucion {
-    private int idDistribucion;
-    private int idRepartidor;
-    private int idEmpaque;
-    private int cantidad;
-    private LocalDateTime fechaDistribucion;
+/**
+ * POJO que representa una línea de la tabla <code>distribucion</code>.
+ * <p>Incluye:</p>
+ * <ul>
+ *   <li>Constructor vacío – requerido por JSP, frameworks y DAOs con setters.</li>
+ *   <li>Constructor completo – práctico para mapeos directos.</li>
+ *   <li>Getters y setters convencionales.</li>
+ * </ul>
+ */
+public class Distribucion implements Serializable {
 
-    // Campo opcional si planeas mostrar el nombre del repartidor en vistas directamente
-    private String nombreRepartidor;
+    /* ---------- campos ---------- */
+    private int             idDistribucion;
+    private int             idRepartidor;
+    private int             idEmpaque;
+    private String          nombreEmpaque;
+    private int             cantidad;
+    private LocalDateTime   fechaDistribucion;
+    private String          nombreRepartidorCompleto;
 
+    /* ---------- constructores ---------- */
+
+    /** Constructor vacío (requerido por beans). */
     public Distribucion() {}
 
-    public Distribucion(int idDistribucion, int idRepartidor, int idEmpaque, int cantidad, LocalDateTime fechaDistribucion) {
-        this.idDistribucion = idDistribucion;
-        this.idRepartidor = idRepartidor;
-        this.idEmpaque = idEmpaque;
-        this.cantidad = cantidad;
-        this.fechaDistribucion = fechaDistribucion;
+    /** Constructor completo – útil para proyecciones JOIN en DAO. */
+    public Distribucion(int idDistribucion,
+                        int idRepartidor,
+                        int idEmpaque,
+                        String nombreEmpaque,
+                        int cantidad,
+                        LocalDateTime fechaDistribucion,
+                        String nombreRepartidorCompleto) {
+        this.idDistribucion          = idDistribucion;
+        this.idRepartidor            = idRepartidor;
+        this.idEmpaque               = idEmpaque;
+        this.nombreEmpaque           = nombreEmpaque;
+        this.cantidad                = cantidad;
+        this.fechaDistribucion       = fechaDistribucion;
+        this.nombreRepartidorCompleto= nombreRepartidorCompleto;
     }
 
-    public int getIdDistribucion() {
-        return idDistribucion;
-    }
+    /* ---------- getters ---------- */
+    public int            getIdDistribucion()         { return idDistribucion; }
+    public int            getIdRepartidor()           { return idRepartidor; }
+    public int            getIdEmpaque()              { return idEmpaque; }
+    public String         getNombreEmpaque()          { return nombreEmpaque; }
+    public int            getCantidad()               { return cantidad; }
+    public LocalDateTime  getFechaDistribucion()      { return fechaDistribucion; }
+    public String         getNombreRepartidorCompleto(){ return nombreRepartidorCompleto; }
 
-    public void setIdDistribucion(int idDistribucion) {
-        this.idDistribucion = idDistribucion;
-    }
-
-    public int getIdRepartidor() {
-        return idRepartidor;
-    }
-
-    public void setIdRepartidor(int idRepartidor) {
-        this.idRepartidor = idRepartidor;
-    }
-
-    public int getIdEmpaque() {
-        return idEmpaque;
-    }
-
-    public void setIdEmpaque(int idEmpaque) {
-        this.idEmpaque = idEmpaque;
-    }
-
-    public int getCantidad() {
-        return cantidad;
-    }
-
-    public void setCantidad(int cantidad) {
-        this.cantidad = cantidad;
-    }
-
-    public LocalDateTime getFechaDistribucion() {
-        return fechaDistribucion;
-    }
-
-    public void setFechaDistribucion(LocalDateTime fechaDistribucion) {
-        this.fechaDistribucion = fechaDistribucion;
-    }
-
-    public String getNombreRepartidor() {
-        return nombreRepartidor;
-    }
-
-    public void setNombreRepartidor(String nombreRepartidor) {
-        this.nombreRepartidor = nombreRepartidor;
-    }
+    /* ---------- setters ---------- */
+    public void setIdDistribucion(int idDistribucion)              { this.idDistribucion = idDistribucion; }
+    public void setIdRepartidor(int idRepartidor)                  { this.idRepartidor = idRepartidor; }
+    public void setIdEmpaque(int idEmpaque)                        { this.idEmpaque = idEmpaque; }
+    public void setNombreEmpaque(String nombreEmpaque)             { this.nombreEmpaque = nombreEmpaque; }
+    public void setCantidad(int cantidad)                          { this.cantidad = cantidad; }
+    public void setFechaDistribucion(LocalDateTime fechaDistribucion){ this.fechaDistribucion = fechaDistribucion; }
+    public void setNombreRepartidorCompleto(String nombreCompleto) { this.nombreRepartidorCompleto = nombreCompleto; }
 }

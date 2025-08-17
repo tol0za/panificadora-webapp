@@ -21,6 +21,23 @@ public class RepartidorDAO {
             ps.executeUpdate();
         }
     }
+    // dao/RepartidorDAO.java
+public List<Repartidor> listarActivos() throws SQLException {
+    List<Repartidor> lista = new ArrayList<>();
+    String sql = "SELECT * FROM repartidores WHERE activo = 1 ORDER BY nombre_repartidor";
+    try (Connection cn = Conexion.getConnection();
+         PreparedStatement ps = cn.prepareStatement(sql);
+         ResultSet rs = ps.executeQuery()) {
+        while (rs.next()) {
+            Repartidor r = new Repartidor();
+            r.setIdRepartidor(rs.getInt("id_repartidor"));
+            r.setNombreRepartidor(rs.getString("nombre_repartidor"));
+            r.setApellidoRepartidor(rs.getString("apellido_repartidor"));
+            lista.add(r);
+        }
+    }
+    return lista;
+}
 
     public void actualizar(Repartidor r) throws SQLException {
         String sql = "UPDATE repartidores SET nombre_repartidor=?, apellido_repartidor=?, telefono=? WHERE id_repartidor=?";

@@ -53,17 +53,17 @@
                 <td class="text-center align-middle">
                   <div class="d-flex justify-content-center gap-2">
                     <a href="${ctx}/SalidaServlet?accion=verDetalle&idRepartidor=${rid}&fecha=${fechaSeleccionada}"
-                       class="btn btn-outline-secondary btn-sm">
-                      <i class="bi bi-eye"></i> Detalle
+                       class="btn btn-outline-primary btn-sm">
+                      <i class="bi bi-eye"></i> 
                     </a>
                     <a href="${ctx}/SalidaServlet?accion=editarMultiple&idRepartidor=${rid}&fecha=${fechaSeleccionada}"
-                       class="btn btn-primary btn-sm">
-                      <i class="bi bi-pencil"></i> Editar salida
+                       class="btn btn-sm btn-outline-success me-1">
+                      <i class="bi bi-pencil-square"></i>
                     </a>
                     <button type="button"
-                            class="btn btn-danger btn-sm"
+                            class="btn btn-sm btn-outline-danger btn-eliminar" 
                             onclick="confirmarEliminarSalida('${ctx}','${rid}','${fechaSeleccionada}')">
-                      <i class="bi bi-trash"></i> Eliminar salida
+                      <i class="bi bi-trash"></i>
                     </button>
                   </div>
                 </td>

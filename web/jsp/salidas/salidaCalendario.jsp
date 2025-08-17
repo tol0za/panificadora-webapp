@@ -100,7 +100,7 @@
 
     <!-- Botones Ver listado / Nueva salida (inferior) -->
     <div class="d-flex justify-content-end">
-      <a href="${ctx}/SalidaServlet?accion=listar" class="btn btn-secondary btn-sm me-2">
+      <a href="${pageContext.request.contextPath}/SalidaServlet?accion=listar" class="btn btn-secondary btn-sm me-2">
         <i class="bi bi-list"></i> Ver listado
       </a>
       <a href="${ctx}/SalidaServlet?accion=nuevo" class="btn btn-success btn-sm">

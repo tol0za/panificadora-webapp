@@ -1,44 +1,64 @@
 package filtro;
 
-import java.io.IOException;
+import dao.RepartidorDAO;
+
 import javax.servlet.*;
 import javax.servlet.annotation.WebFilter;
-import javax.servlet.http.*;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
+import java.io.IOException;
 
 @WebFilter("/*")
 public class LoginFilter implements Filter {
 
-    public void init(FilterConfig filterConfig) throws ServletException {}
+    /*  Rutas públicas que NO requieren sesión  */
+    private static final String[] ALLOW_PUBLIC = {
+        "/jsp/login/",        // carpeta donde vive tu login.jsp
+        "/LoginServlet",
+        "/css/", "/img/", "/static/", "/js/", "/favicon.ico"
+    };
 
-    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
-            throws IOException, ServletException {
+    @Override
+    public void doFilter(ServletRequest req, ServletResponse res,
+                         FilterChain chain) throws IOException, ServletException {
 
-        HttpServletRequest req = (HttpServletRequest) request;
-        HttpServletResponse res = (HttpServletResponse) response;
-        HttpSession session = req.getSession(false);
+        HttpServletRequest  request  = (HttpServletRequest) req;
+        HttpServletResponse response = (HttpServletResponse) res;
+        HttpSession         session  = request.getSession(false);
 
-        String path = req.getRequestURI();
+        String ctx  = request.getContextPath();
+        String path = request.getRequestURI().substring(ctx.length());
 
-        boolean loggedIn = session != null && session.getAttribute("usuario") != null;
-        String rol = (loggedIn) ? (String) session.getAttribute("rol") : null;
+        /* 1. Deja pasar recursos públicos */
+        for (String p : ALLOW_PUBLIC) {
+            if (path.startsWith(p)) {
+                chain.doFilter(req, res);
+                return;
+            }
+        }
 
-        // Rutas públicas
-        boolean accesoPublico = path.contains("login.jsp") || path.contains("LoginServlet") || path.contains("css") || path.contains("js") || path.endsWith(".png");
+        /* 2. Usuario logueado? */
+        if (session != null && session.getAttribute("usuario") != null) {
 
-        // Protección general
-        if (!loggedIn && !accesoPublico) {
-            res.sendRedirect(req.getContextPath() + "/jsp/login/login.jsp");
+            /* Cargar listaRepartidores una sola vez por sesión */
+            if (session.getAttribute("listaRepartidores") == null) {
+                try {
+                    session.setAttribute("listaRepartidores",
+                        new RepartidorDAO().listar());   // usa el método que sí existe
+                } catch (Exception ex) {
+                    throw new ServletException("No se pudo cargar listaRepartidores", ex);
+                }
+            }
+
+            chain.doFilter(req, res);   // continuar flujo normal
             return;
         }
 
-        // Protección de áreas administrativas
-        if (path.contains("/jsp/usuarios") && !"administrador".equals(rol)) {
-            res.sendRedirect(req.getContextPath() + "/jsp/home/inicio.jsp");
-            return;
-        }
-
-        chain.doFilter(request, response);
+        /* 3. No autenticado → redirige a login */
+        response.sendRedirect(ctx + "/jsp/login/login.jsp");  // ruta correcta
     }
 
-    public void destroy() {}
+    @Override public void init(FilterConfig f) {}
+    @Override public void destroy() {}
 }
