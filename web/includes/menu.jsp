@@ -66,7 +66,7 @@
 
 <li class="nav-item">
   <a class="nav-link"
-     href="${pageContext.request.contextPath}/InventarioServlet?accion=listar"
+     href="${pageContext.request.contextPath}/InventarioServlet?inFrame=1&accion=listar"
      draggable="false"
      target="contentFrame">
     <i class="bi bi-box-seam"></i> Inventarios

@@ -74,6 +74,38 @@ public class InventarioEmpaquetadoDAO {
         }
         return lista;
     }
+    
+   // NUEVO: movimientos por empaque (para el modal)
+public List<InventarioEmpaquetado> listarMovimientosPorEmpaque(int idEmpaque) throws SQLException {
+    String sql = """
+        SELECT id_inventario, id_empaque, id_distribucion, id_repartidor,
+               cantidad, fecha, motivo, cantidad_actual
+          FROM inventario_empaquetado
+         WHERE id_empaque = ?
+         ORDER BY fecha DESC
+    """;
+    List<InventarioEmpaquetado> lista = new ArrayList<>();
+    try (Connection c = getConn();
+         PreparedStatement ps = c.prepareStatement(sql)) {
+        ps.setInt(1, idEmpaque);
+        try (ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                InventarioEmpaquetado ie = new InventarioEmpaquetado();
+                ie.setIdInventario   (rs.getInt("id_inventario"));
+                ie.setIdEmpaque      (rs.getInt("id_empaque"));
+                ie.setIdDistribucion ((Integer) rs.getObject("id_distribucion"));
+                ie.setIdRepartidor   ((Integer) rs.getObject("id_repartidor"));
+                ie.setCantidad       (rs.getInt("cantidad"));
+                ie.setMotivo         (rs.getString("motivo"));
+                ie.setCantidadActual (rs.getInt("cantidad_actual"));
+                var ts = rs.getTimestamp("fecha");
+                ie.setFecha(ts != null ? ts.toLocalDateTime() : null);
+                lista.add(ie);
+            }
+        }
+    }
+    return lista;
+} 
 
     /* ============================================================ */
     /*  2. Métodos básicos heredados                                */
