@@ -5,39 +5,55 @@
 <html>
 <head>
   <title>Notas – ${repartidor.nombreRepartidor}</title>
-
   <!-- Bootstrap + Bootstrap-icons -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
 </head>
 
-<!-- bandera para JS -->
-<body data-ctx="${pageContext.request.contextPath}"
-      data-ruta-cerrada="${empty inventario}">
+<c:set var="ctx" value="${pageContext.request.contextPath}"/>
+
+<%-- Calcular stock total disponible del repartidor para hoy --%>
+<c:set var="totalRestante" value="0" />
+<c:forEach items="${inventario}" var="i">
+  <c:set var="totalRestante" value="${totalRestante + i.restante}" />
+</c:forEach>
+<c:set var="puedeNueva" value="${not rutaCerrada and (totalRestante gt 0)}" />
+
+<body data-ctx="${ctx}"
+      data-ruta-cerrada="${rutaCerrada}"
+      data-stock-total="${totalRestante}">
 <div class="container-fluid py-3">
 
-  <!----- CABECERA ----->
+  <!-- CABECERA -->
   <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
     <h4 class="mb-2">
       Notas de venta – ${repartidor.nombreRepartidor} (${hoy})
     </h4>
+    <div class="d-flex gap-2 align-items-center">
+      <c:if test="${not empty listaNotas}">
+        <a class="btn btn-outline-success"
+           href="${ctx}/NotaVentaServlet?inFrame=1&amp;accion=imprimirNotasDia&amp;id_repartidor=${repartidor.idRepartidor}">
+          <i class="bi bi-printer"></i> Imprimir día
+        </a>
+      </c:if>
 
-    <div class="d-flex gap-2">
-      <!-- imprimir TODO el día -->
-     
-<c:if test="${not empty listaNotas}">
-  <a class="btn btn-outline-success"
-     href="${pageContext.request.contextPath}/NotaVentaServlet?inFrame=1&amp;accion=imprimirNotasDia&amp;id_repartidor=${repartidor.idRepartidor}">
-    <i class="bi bi-printer"></i> Imprimir día
-  </a>
-</c:if>
-      <button id="btnNueva" class="btn btn-success">
-        <i class="bi bi-plus-circle"></i> Nueva nota
-      </button>
+      <c:choose>
+        <c:when test="${puedeNueva}">
+          <button id="btnNueva" class="btn btn-success">
+            <i class="bi bi-plus-circle"></i> Nueva nota
+          </button>
+        </c:when>
+        <c:otherwise>
+          <button id="btnNueva" class="btn btn-success" disabled
+                  title="${rutaCerrada ? 'La ruta está cerrada. Reábrela para capturar notas.' : 'Sin stock disponible en el repartidor.'}">
+            <i class="bi bi-plus-circle"></i> Nueva nota
+          </button>
+        </c:otherwise>
+      </c:choose>
     </div>
   </div>
 
-  <!----- FLASH ----->
+  <!-- FLASH -->
   <c:if test="${not empty sessionScope.flashMsg}">
     <c:set var="alertClass"
            value="${fn:contains(sessionScope.flashMsg,'Stock insuficiente')
@@ -50,9 +66,14 @@
     <c:remove var="flashMsg" scope="session"/>
   </c:if>
 
-  <!----- INVENTARIO DISPONIBLE ----->
+  <!-- INVENTARIO DISPONIBLE -->
   <div class="card card-body mb-4">
-    <h6 class="card-title mb-2">Inventario disponible</h6>
+    <div class="d-flex justify-content-between align-items-center">
+      <h6 class="card-title mb-2">Inventario disponible</h6>
+      <span class="badge bg-${totalRestante > 0 ? 'success' : 'secondary'}">
+        Total disponible: ${totalRestante}
+      </span>
+    </div>
     <div class="table-responsive">
       <table class="table table-sm mb-0">
         <thead class="table-light">
@@ -66,12 +87,15 @@
               <td class="text-end">${i.restante}</td>
             </tr>
           </c:forEach>
+          <c:if test="${empty inventario}">
+            <tr><td colspan="3" class="text-center text-muted">Sin registros</td></tr>
+          </c:if>
         </tbody>
       </table>
     </div>
   </div>
 
-  <!----- LISTA DE NOTAS ----->
+  <!-- LISTA DE NOTAS -->
   <div class="card card-body">
     <h6 class="card-title mb-2">Notas registradas</h6>
     <div class="table-responsive">
@@ -94,27 +118,52 @@
               </td>
               <td>${n.total}</td>
               <td class="text-center">
-                <!-- Ver -->
+                <!-- Ver (siempre disponible) -->
                 <a href="#" class="btn btn-sm btn-outline-info me-1 btn-det"
                    data-idNota="${n.idNotaVenta}"
                    data-folio ="${n.folio}"
                    data-tienda="${n.nombreTienda}">
-                   <i class="bi bi-eye"></i>
+                  <i class="bi bi-eye"></i>
                 </a>
-                <!-- Editar -->
-                <a href="${pageContext.request.contextPath}/NotaVentaServlet?inFrame=1&accion=editarNota&id=${n.idNotaVenta}"
-                   class="btn btn-sm btn-outline-primary me-1">
-                  <i class="bi bi-pencil-square"></i>
-                </a>
-                <!-- Eliminar -->
-                <a href="${pageContext.request.contextPath}/NotaVentaServlet?inFrame=1&accion=eliminarNota&id=${n.idNotaVenta}"
-                   class="btn btn-sm btn-outline-danger"
-                   onclick="return confirm('¿Eliminar nota?');">
-                  <i class="bi bi-trash"></i>
-                </a>
+
+                <!-- Editar: sólo cuando ruta ABIERTA -->
+                <c:choose>
+                  <c:when test="${rutaCerrada}">
+                    <button class="btn btn-sm btn-outline-primary me-1" disabled
+                            title="Reabre la ruta para editar esta nota">
+                      <i class="bi bi-pencil-square"></i>
+                    </button>
+                  </c:when>
+                  <c:otherwise>
+                    <a href="${ctx}/NotaVentaServlet?inFrame=1&accion=editarNota&id=${n.idNotaVenta}"
+                       class="btn btn-sm btn-outline-primary me-1">
+                      <i class="bi bi-pencil-square"></i>
+                    </a>
+                  </c:otherwise>
+                </c:choose>
+
+                <!-- Eliminar: sólo cuando ruta ABIERTA -->
+                <c:choose>
+                  <c:when test="${rutaCerrada}">
+                    <button class="btn btn-sm btn-outline-danger" disabled
+                            title="Reabre la ruta para eliminar esta nota">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </c:when>
+                  <c:otherwise>
+                    <a href="${ctx}/NotaVentaServlet?inFrame=1&accion=eliminarNota&id=${n.idNotaVenta}"
+                       class="btn btn-sm btn-outline-danger"
+                       onclick="return confirm('¿Eliminar nota?');">
+                      <i class="bi bi-trash"></i>
+                    </a>
+                  </c:otherwise>
+                </c:choose>
               </td>
             </tr>
           </c:forEach>
+          <c:if test="${empty listaNotas}">
+            <tr><td colspan="4" class="text-center text-muted">Sin notas</td></tr>
+          </c:if>
         </tbody>
         <tfoot class="table-secondary fw-semibold">
           <tr><td colspan="2">Total día</td><td>${totalDia}</td><td></td></tr>
@@ -123,51 +172,55 @@
     </div>
   </div>
 
-  <!----- CERRAR / REABRIR RUTA ----->
+  <!-- CERRAR / REABRIR RUTA -->
   <div class="mt-4">
-    <button class="btn btn-warning"
-            onclick="cerrarRuta(${repartidor.idRepartidor})">
-      Cerrar ruta y devolver sobrante
-    </button>
-
-    <c:if test="${empty inventario}">
-      <form class="d-inline" method="post"
-            action="${pageContext.request.contextPath}/NotaVentaServlet">
-        <input type="hidden" name="inFrame"       value="1"/>
-        <input type="hidden" name="accion"        value="reabrirRuta"/>
-        <input type="hidden" name="id_repartidor" value="${repartidor.idRepartidor}"/>
-        <button type="submit"
-                class="btn btn-outline-warning ms-2"
-                onclick="return confirm('¿Reabrir la ruta para seguir capturando notas?');">
-          <i class="bi bi-arrow-counterclockwise"></i> Reabrir ruta
-        </button>
-      </form>
-    </c:if>
+    <c:choose>
+      <c:when test="${not rutaCerrada}">
+        <form class="d-inline" method="post" action="${ctx}/NotaVentaServlet">
+          <input type="hidden" name="inFrame"       value="1"/>
+          <input type="hidden" name="accion"        value="cerrarRuta"/>
+          <input type="hidden" name="id_repartidor" value="${repartidor.idRepartidor}"/>
+          <button type="submit" class="btn btn-warning"
+                  onclick="return confirm('¿Cerrar ruta y devolver sobrante a bodega?');">
+            <i class="bi bi-box-arrow-in-left"></i> Cerrar ruta y devolver sobrante
+          </button>
+        </form>
+      </c:when>
+      <c:otherwise>
+        <form class="d-inline" method="post" action="${ctx}/NotaVentaServlet">
+          <input type="hidden" name="inFrame"       value="1"/>
+          <input type="hidden" name="accion"        value="reabrirRuta"/>
+          <input type="hidden" name="id_repartidor" value="${repartidor.idRepartidor}"/>
+          <button type="submit" class="btn btn-outline-warning"
+                  onclick="return confirm('¿Reabrir la ruta para seguir capturando notas?');">
+            <i class="bi bi-arrow-counterclockwise"></i> Reabrir ruta
+          </button>
+        </form>
+      </c:otherwise>
+    </c:choose>
   </div>
+
 </div>
+
 <!-- ============ MODAL NUEVA NOTA ============ -->
 <div id="modalNota" class="modal fade" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg"><div class="modal-content">
-    <form id="formNota" action="${pageContext.request.contextPath}/NotaVentaServlet" method="post">
+    <form id="formNota" action="${ctx}/NotaVentaServlet" method="post">
       <input type="hidden" name="accion"        value="guardarNota">
       <input type="hidden" name="id_repartidor" value="${repartidor.idRepartidor}">
       <input type="hidden" id="lineas" name="lineas">
-
       <div class="modal-header">
         <h5 class="modal-title">Nueva nota</h5>
         <button class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-
       <div class="modal-body">
         <div class="row g-2 mb-3">
-          <!-- Folio -->
           <div class="col-md-4">
             <label class="form-label">Folio</label>
             <input id="inpFolio" name="folio" required class="form-control">
             <div id="folioHelpBad"  class="form-text text-danger  d-none">El folio ya existe</div>
             <div id="folioHelpGood" class="form-text text-success d-none">Folio disponible ✓</div>
           </div>
-          <!-- Tienda -->
           <div class="col-md-8">
             <label class="form-label">Tienda</label>
             <select id="selTienda" name="id_tienda" class="form-select" disabled required>
@@ -179,7 +232,6 @@
           </div>
         </div>
 
-        <!-- Detalle -->
         <div class="table-responsive mb-2">
           <table id="tblDetalle" class="table table-bordered">
             <thead class="table-light">
@@ -191,13 +243,11 @@
             </tfoot>
           </table>
         </div>
-
         <button id="btnAddLinea" type="button"
                 class="btn btn-outline-secondary w-100" disabled>
           + Agregar paquete
         </button>
       </div>
-
       <div class="modal-footer">
         <button id="btnSave" class="btn btn-primary" disabled>Guardar nota</button>
       </div>
@@ -214,7 +264,6 @@
     </div>
     <div class="modal-body">
       <p><strong>Tienda:</strong> <span id="mdTienda"></span></p>
-
       <div class="table-responsive">
         <table class="table table-bordered">
           <thead class="table-light">
@@ -239,8 +288,9 @@
 <!-- INVENTARIO JSON OCULTO -->
 <script id="inventarioJson" type="application/json">${inventarioJson}</script>
 
-<!-- Bootstrap bundle + JS -->
+<!-- JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="${pageContext.request.contextPath}/static/js/notas.js"></script>
+<script src="${ctx}/static/js/notas.js"></script>
+
 </body>
 </html>
