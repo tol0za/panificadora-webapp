@@ -341,10 +341,10 @@ private void guardarNota(HttpServletRequest req,
         if (n == null){ repartidoresHoy(req,res); return; }
 
         for (DetalleNotaVenta d : detalleDAO.listarPorNota(idNota)) {
-            int piezas = d.getCantidadVendida()+d.getMerma();
-            invRepDAO.devolver(n.getIdRepartidor(), d.getIdEmpaque(), piezas);
-            invGlobalDAO.regresarStockGeneral(d.getIdEmpaque(), piezas);
-        }
+    int piezas = d.getCantidadVendida() + d.getMerma();
+    // Solo devolvemos al inventario del repartidor
+    invRepDAO.devolver(n.getIdRepartidor(), d.getIdEmpaque(), piezas);
+}
         detalleDAO.eliminarPorNota(idNota);
         notaDAO.eliminar(idNota);
 

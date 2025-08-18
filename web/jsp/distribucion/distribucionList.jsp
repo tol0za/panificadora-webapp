@@ -2,11 +2,13 @@
 <%@ taglib prefix="c"  uri="http://java.sun.com/jsp/jstl/core" %>
 <%@ taglib prefix="fn" uri="http://java.sun.com/jsp/jstl/functions" %>
 
-<!-- Carga la lista al entrar -->
-<jsp:include page="/DistribucionServlet">
-  <jsp:param name="accion" value="listar"/>
-  <jsp:param name="fecha"  value="${param.fecha}"/>
-</jsp:include>
+<!-- Carga la lista al entrar (solo si aún no viene del servlet) -->
+<c:if test="${empty requestScope.salidas}">
+  <jsp:include page="/DistribucionServlet">
+    <jsp:param name="accion" value="listar"/>
+    <jsp:param name="fecha"  value="${param.fecha}"/>
+  </jsp:include>
+</c:if>
 
 <!-- ▬▬ CSS ▬▬ -->
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>

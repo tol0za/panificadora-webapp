@@ -261,60 +261,61 @@ public void registrarMovimientoSalida(int idEmpaque,
                               motivo, stockPosterior);
 }
 
-    public void regresarStockGeneral(int idEmp, int cant, int idRep) throws SQLException {
-        int nuevoStock = obtenerCantidadActual(idEmp) + cant;
-        String sql = """
-            INSERT INTO inventario_empaquetado
-                  (id_empaque,cantidad,motivo,id_repartidor,fecha,cantidad_actual)
-            VALUES (?, ?, 'ENTRADA_RETORNO', ?, NOW(), ?)
-        """;
-        try (Connection c = getConn();
-             PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setInt(1, idEmp);
-            ps.setInt(2, cant);
-            ps.setInt(3, idRep);
-            ps.setInt(4, nuevoStock);
-            ps.executeUpdate();
-        }
-    }
+public void regresarStockGeneral(int idEmp, int cant, int idRep) throws SQLException {
+    int nuevoStock = obtenerCantidadActual(idEmp) + cant;
+    String sql = """
+        INSERT INTO inventario_empaquetado
+              (id_empaque,cantidad,motivo,id_repartidor,fecha,cantidad_actual)
+        VALUES (?, ?, 'ENTRADA_RETORNO', ?, NOW(), ?)
+    """;
+    try (Connection c = getConn();
+         PreparedStatement ps = c.prepareStatement(sql)) {
 
-    public void regresarStockGeneral(int idEmp, int cant) throws SQLException {
-        regresarStockGeneral(idEmp, cant, 0);
+        ps.setInt(1, idEmp);
+        ps.setInt(2, cant);
+        // 👇 si no tienes repartidor, manda NULL (no 0)
+        ps.setObject(3, (idRep == 0 ? null : idRep), java.sql.Types.INTEGER);
+        ps.setInt(4, nuevoStock);
+        ps.executeUpdate();
     }
+}
+
+// mantiene compatibilidad; ahora ya no “rompe” porque el de arriba convierte 0→NULL
+public void regresarStockGeneral(int idEmp, int cant) throws SQLException {
+    regresarStockGeneral(idEmp, cant, 0);
+}
+
 
     /* ============================================================ */
     /*  4. Retornos pendientes por repartidor / día                 */
     /* ============================================================ */
 
-    public Map<Integer,Integer> obtenerRetornoPorRepartidorYFecha(int idRep,
-                                                                  LocalDate fecha) throws SQLException {
-        String sql = """
-            SELECT id_empaque,
-                   SUM(CASE
-                         WHEN motivo = 'ENTRADA_RETORNO' THEN  cantidad
-                         WHEN motivo = 'REABRIR_RUTA'    THEN -cantidad
-                       END) AS pendientes
-              FROM inventario_empaquetado
-             WHERE id_repartidor = ?
-               AND fecha >= ?  AND fecha < ?
-             GROUP BY id_empaque
-             HAVING pendientes > 0
-        """;
-        Map<Integer,Integer> map = new HashMap<>();
-        try (Connection c = getConn();
-             PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setInt(1, idRep);
-            ps.setTimestamp(2, Timestamp.valueOf(fecha.atStartOfDay()));
-            ps.setTimestamp(3, Timestamp.valueOf(fecha.plusDays(1).atStartOfDay()));
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    map.put(rs.getInt("id_empaque"),
-                            rs.getInt("pendientes"));
-                }
+public Map<Integer,Integer> obtenerRetornoPorRepartidorYFecha(int idRep,
+                                                              LocalDate fecha) throws SQLException {
+    String sql = """
+        SELECT id_empaque,
+               SUM(cantidad) AS pendientes
+          FROM inventario_empaquetado
+         WHERE id_repartidor = ?
+           AND motivo IN ('ENTRADA_RETORNO','REABRIR_RUTA')  -- ← sólo estos dos
+           AND fecha >= ?  AND fecha < ?
+         GROUP BY id_empaque
+         HAVING pendientes > 0
+    """;
+    Map<Integer,Integer> map = new HashMap<>();
+    try (Connection c = getConn();
+         PreparedStatement ps = c.prepareStatement(sql)) {
+        ps.setInt(1, idRep);
+        ps.setTimestamp(2, Timestamp.valueOf(fecha.atStartOfDay()));
+        ps.setTimestamp(3, Timestamp.valueOf(fecha.plusDays(1).atStartOfDay()));
+        try (ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                map.put(rs.getInt("id_empaque"), rs.getInt("pendientes"));
             }
         }
-        return map;
     }
+    return map;
+}
 
     /* ============================================================ */
     /*  5. NUEVOS helpers: mismos nombres que usará DistribucionDAO */
