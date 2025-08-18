@@ -5,14 +5,12 @@
 <html>
 <head>
   <title>Notas – ${repartidor.nombreRepartidor}</title>
-  <!-- Bootstrap + Bootstrap-icons -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
 </head>
 
 <c:set var="ctx" value="${pageContext.request.contextPath}"/>
 
-<%-- Calcular stock total disponible del repartidor para hoy --%>
 <c:set var="totalRestante" value="0" />
 <c:forEach items="${inventario}" var="i">
   <c:set var="totalRestante" value="${totalRestante + i.restante}" />
@@ -24,7 +22,6 @@
       data-stock-total="${totalRestante}">
 <div class="container-fluid py-3">
 
-  <!-- CABECERA -->
   <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
     <h4 class="mb-2">
       Notas de venta – ${repartidor.nombreRepartidor} (${hoy})
@@ -53,20 +50,19 @@
     </div>
   </div>
 
-  <!-- FLASH -->
   <c:if test="${not empty sessionScope.flashMsg}">
-    <c:set var="alertClass"
-           value="${fn:contains(sessionScope.flashMsg,'Stock insuficiente')
-                    or fn:contains(sessionScope.flashMsg,'Error')
-                    ? 'alert-danger' : 'alert-success'}"/>
-    <div class="alert ${alertClass} alert-dismissible fade show mb-3" role="alert">
-      <c:out value="${sessionScope.flashMsg}" escapeXml="false"/>
-      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <c:set var="flashKindAuto"
+           value="${fn:contains(sessionScope.flashMsg,'Error') or fn:contains(sessionScope.flashMsg,'insuficiente') ? 'error' : 'success'}"/>
+    <div id="flashBridge" class="d-none"
+         data-kind ="${empty sessionScope.flashKind ? flashKindAuto : sessionScope.flashKind}"
+         data-title="${empty sessionScope.flashTitle ? 'Operación realizada' : sessionScope.flashTitle}">
+      <span id="flashMessage"><c:out value="${sessionScope.flashMsg}"/></span>
     </div>
-    <c:remove var="flashMsg" scope="session"/>
+    <c:remove var="flashMsg"   scope="session"/>
+    <c:remove var="flashKind"  scope="session"/>
+    <c:remove var="flashTitle" scope="session"/>
   </c:if>
 
-  <!-- INVENTARIO DISPONIBLE -->
   <div class="card card-body mb-4">
     <div class="d-flex justify-content-between align-items-center">
       <h6 class="card-title mb-2">Inventario disponible</h6>
@@ -95,7 +91,6 @@
     </div>
   </div>
 
-  <!-- LISTA DE NOTAS -->
   <div class="card card-body">
     <h6 class="card-title mb-2">Notas registradas</h6>
     <div class="table-responsive">
@@ -118,7 +113,6 @@
               </td>
               <td>${n.total}</td>
               <td class="text-center">
-                <!-- Ver (siempre disponible) -->
                 <a href="#" class="btn btn-sm btn-outline-info me-1 btn-det"
                    data-idNota="${n.idNotaVenta}"
                    data-folio ="${n.folio}"
@@ -126,7 +120,6 @@
                   <i class="bi bi-eye"></i>
                 </a>
 
-                <!-- Editar: sólo cuando ruta ABIERTA -->
                 <c:choose>
                   <c:when test="${rutaCerrada}">
                     <button class="btn btn-sm btn-outline-primary me-1" disabled
@@ -142,7 +135,6 @@
                   </c:otherwise>
                 </c:choose>
 
-                <!-- Eliminar: sólo cuando ruta ABIERTA -->
                 <c:choose>
                   <c:when test="${rutaCerrada}">
                     <button class="btn btn-sm btn-outline-danger" disabled
@@ -151,9 +143,11 @@
                     </button>
                   </c:when>
                   <c:otherwise>
-                    <a href="${ctx}/NotaVentaServlet?inFrame=1&accion=eliminarNota&id=${n.idNotaVenta}"
-                       class="btn btn-sm btn-outline-danger"
-                       onclick="return confirm('¿Eliminar nota?');">
+                    <a href="#"
+                       class="btn btn-sm btn-outline-danger js-confirm-goto"
+                       data-url="${ctx}/NotaVentaServlet?inFrame=1&accion=eliminarNota&id=${n.idNotaVenta}"
+                       data-title="Eliminar nota"
+                       data-msg="¿Eliminar la nota con folio ${n.folio}?">
                       <i class="bi bi-trash"></i>
                     </a>
                   </c:otherwise>
@@ -172,7 +166,6 @@
     </div>
   </div>
 
-  <!-- CERRAR / REABRIR RUTA -->
   <div class="mt-4">
     <c:choose>
       <c:when test="${not rutaCerrada}">
@@ -180,8 +173,10 @@
           <input type="hidden" name="inFrame"       value="1"/>
           <input type="hidden" name="accion"        value="cerrarRuta"/>
           <input type="hidden" name="id_repartidor" value="${repartidor.idRepartidor}"/>
-          <button type="submit" class="btn btn-warning"
-                  onclick="return confirm('¿Cerrar ruta y devolver sobrante a bodega?');">
+          <button type="button"
+                  class="btn btn-warning js-confirm-submit"
+                  data-title="Cerrar ruta"
+                  data-msg="¿Cerrar ruta y devolver sobrante a bodega?">
             <i class="bi bi-box-arrow-in-left"></i> Cerrar ruta y devolver sobrante
           </button>
         </form>
@@ -191,8 +186,10 @@
           <input type="hidden" name="inFrame"       value="1"/>
           <input type="hidden" name="accion"        value="reabrirRuta"/>
           <input type="hidden" name="id_repartidor" value="${repartidor.idRepartidor}"/>
-          <button type="submit" class="btn btn-outline-warning"
-                  onclick="return confirm('¿Reabrir la ruta para seguir capturando notas?');">
+          <button type="button"
+                  class="btn btn-outline-warning js-confirm-submit"
+                  data-title="Reabrir ruta"
+                  data-msg="¿Reabrir la ruta para seguir capturando notas?">
             <i class="bi bi-arrow-counterclockwise"></i> Reabrir ruta
           </button>
         </form>
@@ -202,7 +199,6 @@
 
 </div>
 
-<!-- ============ MODAL NUEVA NOTA ============ -->
 <div id="modalNota" class="modal fade" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg"><div class="modal-content">
     <form id="formNota" action="${ctx}/NotaVentaServlet" method="post">
@@ -255,7 +251,6 @@
   </div></div>
 </div>
 
-<!-- ============ MODAL DETALLE NOTA ============ -->
 <div id="modalDet" class="modal fade" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg"><div class="modal-content">
     <div class="modal-header">
@@ -285,12 +280,124 @@
   </div></div>
 </div>
 
-<!-- INVENTARIO JSON OCULTO -->
+<!-- Modal de confirmación -->
+<div class="modal fade" id="mdlConfirm" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header">
+      <h5 id="confirmTitle" class="modal-title">Confirmación</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    </div>
+    <div class="modal-body">
+      <p id="confirmMsg" class="mb-0">¿Deseas continuar?</p>
+    </div>
+    <div class="modal-footer">
+      <button id="btnConfirmOk" type="button" class="btn btn-primary">Sí, continuar</button>
+      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+    </div>
+  </div></div>
+</div>
+
+<!-- Modal de notificación -->
+<div class="modal fade" id="mdlFlash" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog"><div class="modal-content border">
+    <div id="flashHeader" class="modal-header">
+      <h5 class="modal-title d-flex align-items-center gap-2">
+        <i id="flashIcon" class="bi"></i>
+        <span id="flashTitle">Operación realizada</span>
+      </h5>
+      <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    </div>
+    <div class="modal-body">
+      <p id="flashMsg" class="mb-0"></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" data-bs-dismiss="modal">Aceptar</button>
+    </div>
+  </div></div>
+</div>
+
 <script id="inventarioJson" type="application/json">${inventarioJson}</script>
 
-<!-- JS -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="${ctx}/static/js/notas.js"></script>
+
+<script>
+(function () {
+  // Mostrar modal de notificación si hay flash en sesión
+  const fb = document.getElementById('flashBridge');
+  if (fb) {
+    const kind  = fb.dataset.kind || 'success';
+    const title = fb.dataset.title || 'Operación realizada';
+    const msg   = fb.querySelector('#flashMessage')?.textContent || '';
+
+    const map = {
+      success: { icon: 'bi-check-circle', header: 'bg-success-subtle border-success', title: 'text-success' },
+      error:   { icon: 'bi-x-circle',     header: 'bg-danger-subtle border-danger',   title: 'text-danger'  },
+      warning: { icon: 'bi-exclamation-triangle', header: 'bg-warning-subtle border-warning', title: 'text-warning' },
+      info:    { icon: 'bi-info-circle',  header: 'bg-info-subtle border-info',       title: 'text-info'    }
+    };
+    const conf = map[kind] || map.success;
+
+    const elIcon   = document.getElementById('flashIcon');
+    const elTitle  = document.getElementById('flashTitle');
+    const elMsg    = document.getElementById('flashMsg');
+    const elHeader = document.getElementById('flashHeader');
+
+    elIcon.className = 'bi ' + conf.icon;
+    elTitle.className = conf.title;
+    elHeader.className = 'modal-header ' + conf.header;
+
+    elTitle.textContent = title;
+    elMsg.textContent   = msg;
+
+    new bootstrap.Modal(document.getElementById('mdlFlash')).show();
+  }
+
+  // Confirmación modal reutilizable
+  const mdlEl = document.getElementById('mdlConfirm');
+  const mdl   = new bootstrap.Modal(mdlEl);
+  let onOk = null;
+
+  document.getElementById('btnConfirmOk').addEventListener('click', function () {
+    if (typeof onOk === 'function') onOk();
+    onOk = null;
+    mdl.hide();
+  });
+
+  function openConfirm(opts) {
+    document.getElementById('confirmTitle').textContent = opts.title || 'Confirmación';
+    document.getElementById('confirmMsg').textContent   = opts.msg   || '¿Deseas continuar?';
+    onOk = opts.onOk || null;
+    mdl.show();
+  }
+
+  // Botones que confirman envío de formulario
+  document.querySelectorAll('.js-confirm-submit').forEach(function (btn) {
+    btn.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      const form = btn.closest('form');
+      openConfirm({
+        title: btn.dataset.title || 'Confirmación',
+        msg:   btn.dataset.msg   || '¿Deseas continuar?',
+        onOk:  function () { form.submit(); }
+      });
+    });
+  });
+
+  // Enlaces que confirman navegación (eliminar nota, etc.)
+  document.querySelectorAll('.js-confirm-goto').forEach(function (a) {
+    a.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      const url = a.dataset.url || a.getAttribute('href');
+      openConfirm({
+        title: a.dataset.title || 'Confirmación',
+        msg:   a.dataset.msg   || '¿Deseas continuar?',
+        onOk:  function () { window.location.href = url; }
+      });
+    });
+  });
+})();
+</script>
 
 </body>
 </html>
