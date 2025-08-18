@@ -1,5 +1,5 @@
 <%@ page contentType="text/html;charset=UTF-8" language="java" %>
-<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
+<%@ taglib prefix="c"  uri="http://java.sun.com/jsp/jstl/core" %>
 <%@ taglib prefix="fmt" uri="http://java.sun.com/jsp/jstl/fmt" %>
 <%@ taglib prefix="fn" uri="http://java.sun.com/jsp/jstl/functions" %>
 <c:set var="ctx" value="${pageContext.request.contextPath}" />
@@ -23,15 +23,15 @@
     <!-- Empaque + Stock Display -->
     <div class="col-md-5">
       <label for="selectEmpaque" class="form-label">Empaque</label>
-     <select name="idEmpaque" id="selectEmpaque" class="form-select" required>
-  <option value="" disabled selected>Selecciona un empaque</option>
-  <c:forEach var="empaque" items="${empaques}">
-    <c:set var="stockVal" value="${stockMap[empaque.idEmpaque] != null ? stockMap[empaque.idEmpaque] : 0}" />
-    <option value="${empaque.idEmpaque}" data-stock="${stockVal}">
-      ${empaque.nombreEmpaque}
-    </option>
-  </c:forEach>
-</select>
+      <select name="idEmpaque" id="selectEmpaque" class="form-select" required>
+        <option value="" disabled selected>Selecciona un empaque</option>
+        <c:forEach var="empaque" items="${empaques}">
+          <c:set var="stockVal" value="${stockMap[empaque.idEmpaque] != null ? stockMap[empaque.idEmpaque] : 0}" />
+          <option value="${empaque.idEmpaque}" data-stock="${stockVal}">
+            ${empaque.nombreEmpaque}
+          </option>
+        </c:forEach>
+      </select>
       <div class="invalid-feedback">Selecciona un empaque.</div>
       <div class="form-text text-secondary" id="stockDisplay">
         Total de piezas disponibles: —
@@ -118,10 +118,10 @@
 <script>
   document.addEventListener("DOMContentLoaded", function() {
     var selectEmpaque = document.getElementById("selectEmpaque");
-    var stockDisplay = document.getElementById("stockDisplay");
+    var stockDisplay  = document.getElementById("stockDisplay");
 
     function actualizarStock() {
-      var opt = selectEmpaque.selectedOptions[0];
+      var opt   = selectEmpaque.selectedOptions[0];
       var stock = opt ? opt.getAttribute("data-stock") : null;
       stockDisplay.innerHTML = (stock !== null && stock !== "")
         ? "Total de piezas disponibles: <strong>" + stock + "</strong>"
@@ -131,12 +131,12 @@
     selectEmpaque.addEventListener("change", actualizarStock);
     actualizarStock();
 
-    // Validar cantidad contra stock al enviar el formulario
+    // Validar cantidad contra stock al enviar el formulario (para salidas/mermas)
     document.getElementById("formInventario").addEventListener("submit", function(e) {
       var motivo   = document.getElementById("selectMotivo").value.toLowerCase();
       var cantidad = +document.getElementById("inputCantidad").value;
       var opt      = selectEmpaque.selectedOptions[0];
-      var stock    = +opt?.getAttribute("data-stock") || 0;
+      var stock    = +((opt && opt.getAttribute("data-stock")) || 0);
 
       if ((motivo.includes("salida") || motivo.includes("merma")) && cantidad > stock) {
         e.preventDefault();
@@ -151,18 +151,24 @@
   });
 </script>
 
-<!-- Alerta post-movimiento -->
-<c:if test="${not empty sessionScope.mensaje}">
+<!-- 🔔 Alerta post-movimiento SOLO de Inventario -->
+<c:if test="${not empty sessionScope.flashInv}">
   <script>
-    Swal.fire({
-      icon: 'success',
-      title: 'Movimiento registrado',
-      html: `${sessionScope.mensaje}`,
-      confirmButtonText: 'Aceptar'
+    document.addEventListener('DOMContentLoaded', function(){
+      Swal.fire({
+        icon: 'success',
+        title: 'Movimiento registrado',
+        html: `${sessionScope.flashInv}`,
+        confirmButtonText: 'Aceptar'
+      });
     });
   </script>
-  <c:set var="sessionScope.mensaje" value="" />
+  <c:remove var="flashInv" scope="session"/>
 </c:if>
+
+<!-- 🧹 Limpieza defensiva de flashes AJENOS (por si llegaste navegando) -->
+<c:remove var="flashSalida" scope="session"/>
+<c:remove var="flashNotas"  scope="session"/>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>

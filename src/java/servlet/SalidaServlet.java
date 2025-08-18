@@ -104,6 +104,7 @@ public class SalidaServlet extends HttpServlet {
                 }
                 request.setAttribute("repartidores", repartidores);
                 request.setAttribute("empaques",     empaquesConStock);
+                
                 request.setAttribute("stockMap",     stockFiltrado);
                 request.getRequestDispatcher("/jsp/salidas/salidaForm.jsp")
                        .forward(request, response);
@@ -255,7 +256,7 @@ else if ("verDia".equals(accion)) {
                 String[] cantidades= request.getParameterValues("cantidad[]");
                 if (empaques == null || cantidades == null || empaques.length != cantidades.length) {
                     request.getSession().setAttribute("mensaje", "Error: Debes seleccionar al menos un producto y cantidad.");
-                    response.sendRedirect("SalidaServlet?accion=nuevo");
+                    response.sendRedirect(request.getContextPath()+"/SalidaServlet?accion=nuevo&inFrame=1");
                     return;
                 }
                 for (int i = 0; i < empaques.length; i++) {
@@ -270,7 +271,7 @@ else if ("verDia".equals(accion)) {
                     salidaDAO.registrarSalida(s);
                 }
                 request.getSession().setAttribute("mensaje", "Salida registrada correctamente.");
-                response.sendRedirect("SalidaServlet?accion=nuevo");
+                response.sendRedirect(request.getContextPath()+"/SalidaServlet?accion=nuevo&inFrame=1");
                 return;
             }
         } catch (Exception e) {
@@ -299,7 +300,7 @@ else if ("verDia".equals(accion)) {
 
             req.getSession().setAttribute("mensaje",
                     "Error: Debes seleccionar al menos un producto y cantidad.");
-            res.sendRedirect("SalidaServlet?accion=nuevo");
+            res.sendRedirect(req.getContextPath()+"/SalidaServlet?accion=nuevo&inFrame=1");
             return;
         }
 
@@ -331,7 +332,7 @@ else if ("verDia".equals(accion)) {
 
         req.getSession().setAttribute("mensaje", "Salida registrada correctamente.");
         /* Redirige al mismo formulario para recargar inventario disponible */
-        res.sendRedirect("SalidaServlet?accion=nuevo");
+        res.sendRedirect(req.getContextPath()+"/SalidaServlet?accion=nuevo&inFrame=1");
     }
 
     /* ---------- AJAX: lista de empaques en JSON --------------- */

@@ -88,11 +88,9 @@
     <form id="frmNuevaSalida" class="modal-content"
           action="${pageContext.request.contextPath}/DistribucionServlet" method="post">
       <input type="hidden" name="accion" value="crear">
-
       <div class="modal-header">
         <h5 class="modal-title"><i class="bi bi-truck"></i> Registrar salida</h5>
       </div>
-
       <div class="modal-body">
         <!-- Repartidor -->
         <div class="mb-3">
@@ -106,9 +104,7 @@
             </c:forEach>
           </select>
         </div>
-
         <hr class="my-3"/>
-
         <!-- líneas -->
         <table class="table" id="tblLineas">
           <thead>
@@ -116,12 +112,10 @@
           </thead>
           <tbody></tbody>
         </table>
-
         <button type="button" class="btn btn-outline-secondary btn-sm" id="btnAgregarLinea">
           <i class="bi bi-plus-circle"></i> Agregar línea
         </button>
       </div>
-
       <div class="modal-footer">
         <button type="button" id="btnGuardar" class="btn btn-success">
           <i class="bi bi-save"></i> Guardar
@@ -139,4 +133,34 @@
   document.getElementById('fechaHoy').textContent =
       new Date().toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit',year:'numeric'});
 </script>
+
+<!-- ▬▬ MODAL DE NOTIFICACIÓN (SOLO PARA SALIDAS) ▬▬ -->
+<c:if test="${not empty sessionScope.flashSalida}">
+  <div class="modal fade" id="mdlSalidaMsg" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-sm">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">
+            <i class="bi bi-check-circle text-success"></i> Listo
+          </h5>
+          <button class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <c:out value="${sessionScope.flashSalida}" />
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-primary" data-bs-dismiss="modal">Aceptar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    document.addEventListener('DOMContentLoaded', function(){
+      var m = new bootstrap.Modal(document.getElementById('mdlSalidaMsg'));
+      m.show();
+    });
+  </script>
+  <c:remove var="flashSalida" scope="session"/>
+</c:if>
+
 </body>

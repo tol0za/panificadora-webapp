@@ -23,6 +23,9 @@ public class DistribucionServlet extends HttpServlet {
 
     private final DistribucionDAO dao = new DistribucionDAO();
 
+    /* ---- Claves de sesión para evitar fugas entre módulos ---- */
+    private static final String FLASH_SALIDA = "flashSalida";
+
     /* -------------------------------- util ----------------------------- */
     private static boolean esAjax(HttpServletRequest req) {
         String hdr = req.getHeader("X-Requested-With");
@@ -43,10 +46,9 @@ public class DistribucionServlet extends HttpServlet {
                 /* ------ Listar (carga JSP) ------ */
                 case "listar" -> {
                     LocalDate fecha = (req.getParameter("fecha") == null ||
-                                      req.getParameter("fecha").isBlank())
+                                       req.getParameter("fecha").isBlank())
                                       ? LocalDate.now()
                                       : LocalDate.parse(req.getParameter("fecha"));
-
                     List<?> salidas = dao.listarPorFecha(fecha);
                     req.setAttribute("salidas", salidas);
                     req.getRequestDispatcher("/jsp/distribucion/distribucionList.jsp")
@@ -58,7 +60,8 @@ public class DistribucionServlet extends HttpServlet {
                 case "detalle" -> {
                     int idRep = Integer.parseInt(req.getParameter("idRepartidor"));
                     LocalDateTime f = LocalDateTime.parse(req.getParameter("fecha"));
-                    List<DistribucionFilaDTO> filas = dao.buscarPorRepartidorYFechaHora(idRep, f);
+                    List<DistribucionFilaDTO> filas =
+                            dao.buscarPorRepartidorYFechaHora(idRep, f);
 
                     resp.setContentType("application/json;charset=UTF-8");
                     StringBuilder json = new StringBuilder("[");
@@ -69,10 +72,10 @@ public class DistribucionServlet extends HttpServlet {
                             .append(d.getCantidad())
                             .append("},");
                     }
-                    if (json.length() > 1) json.setLength(json.length()-1); // quita coma final
+                    if (json.length() > 1) json.setLength(json.length() - 1); // quita coma final
                     json.append(']');
                     resp.getWriter().print(json.toString());
-                    return;                         // evita redirección
+                    return; // evita redirección
                 }
 
                 /* ------ Eliminar salida --------- */
@@ -80,7 +83,8 @@ public class DistribucionServlet extends HttpServlet {
                     int idRep = Integer.parseInt(req.getParameter("idRepartidor"));
                     LocalDateTime f = LocalDateTime.parse(req.getParameter("fecha"));
                     dao.eliminarSalida(idRep, f);
-                    req.getSession().setAttribute("mensaje",
+                    // usar clave local para que solo aparezca en distribucionList.jsp
+                    req.getSession().setAttribute(FLASH_SALIDA,
                             "Salida eliminada; inventario restituido.");
                 }
 
@@ -89,12 +93,12 @@ public class DistribucionServlet extends HttpServlet {
                     return;
                 }
             }
-
         } catch (Exception ex) {
-            req.getSession().setAttribute("error", ex.getMessage());
+            // Mensaje de error local a este módulo
+            req.getSession().setAttribute(FLASH_SALIDA, "Error: " + ex.getMessage());
         }
 
-        /* Solo delete redirige (navegación clásica) */
+        // Solo delete cae aquí: navegar al JSP (el JSP hará include de “listar” si lo necesita)
         resp.sendRedirect(ctx + "/jsp/distribucion/distribucionList.jsp");
     }
 
@@ -110,27 +114,75 @@ public class DistribucionServlet extends HttpServlet {
         try {
             switch (accion == null ? "" : accion) {
 
-                /* ------ Crear salida ----------- */
+                /* ------ Crear salida (desde modal) ----------- */
                 case "crear" -> {
                     int idRep = Integer.parseInt(req.getParameter("idRepartidor"));
+
                     String[] idEmpaques = req.getParameterValues("id_empaque[]");
                     String[] cantidades = req.getParameterValues("cantidad[]");
-
-                    Map<Integer,Integer> lineas = new LinkedHashMap<>();
-                    for (int i = 0; i < idEmpaques.length; i++) {
-                        lineas.put(Integer.parseInt(idEmpaques[i]),
-                                   Integer.parseInt(cantidades[i]));
+                    if (idEmpaques == null || cantidades == null || idEmpaques.length != cantidades.length) {
+                        if (ajax) {
+                            resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                            resp.getWriter().print("Parámetros inválidos");
+                            return;
+                        } else {
+                            req.getSession().setAttribute(FLASH_SALIDA, "Parámetros inválidos");
+                            resp.sendRedirect(ctx + "/jsp/distribucion/distribucionList.jsp");
+                            return;
+                        }
                     }
+
+                    Map<Integer, Integer> lineas = new LinkedHashMap<>();
+                    for (int i = 0; i < idEmpaques.length; i++) {
+                        int idEmp = Integer.parseInt(idEmpaques[i]);
+                        int cant  = Integer.parseInt(cantidades[i]);
+                        if (cant > 0) {
+                            lineas.put(idEmp, cant);
+                        }
+                    }
+
+                    if (lineas.isEmpty()) {
+                        if (ajax) {
+                            resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                            resp.getWriter().print("No hay líneas válidas.");
+                            return;
+                        } else {
+                            req.getSession().setAttribute(FLASH_SALIDA, "No hay líneas válidas.");
+                            resp.sendRedirect(ctx + "/jsp/distribucion/distribucionList.jsp");
+                            return;
+                        }
+                    }
+
                     dao.crearSalida(idRep, lineas);
-                    req.getSession().setAttribute("mensaje", "Salida registrada.");
+                    // CLAVE: usar flashSalida para que solo lo lea distribucionList.jsp
+                    req.getSession().setAttribute(FLASH_SALIDA, "Salida registrada correctamente.");
+
+                    // Respuesta según tipo
+                    if (ajax) {
+                        resp.setContentType("text/plain;charset=UTF-8");
+                        resp.getWriter().print("OK");
+                        return; // no redirigir en AJAX
+                    } else {
+                        resp.sendRedirect(ctx + "/jsp/distribucion/distribucionList.jsp");
+                        return;
+                    }
                 }
 
-                /* ------ Editar línea ----------- */
+                /* ------ Editar línea (inline) ----------- */
                 case "editarLinea" -> {
                     int idDist = Integer.parseInt(req.getParameter("idDistribucion"));
                     int nueva  = Integer.parseInt(req.getParameter("cantidad"));
                     dao.actualizarCantidad(idDist, nueva);
-                    req.getSession().setAttribute("mensaje", "Cantidad actualizada.");
+                    req.getSession().setAttribute(FLASH_SALIDA, "Cantidad actualizada.");
+
+                    if (ajax) {
+                        resp.setContentType("text/plain;charset=UTF-8");
+                        resp.getWriter().print("OK");
+                        return;
+                    } else {
+                        resp.sendRedirect(ctx + "/jsp/distribucion/distribucionList.jsp");
+                        return;
+                    }
                 }
 
                 default -> {
@@ -139,20 +191,12 @@ public class DistribucionServlet extends HttpServlet {
                 }
             }
 
-            /* ------ Respuesta --------- */
-            if (ajax) {
-                resp.setContentType("text/plain");
-                resp.getWriter().print("OK");
-            } else {
-                resp.sendRedirect(ctx + "/jsp/distribucion/distribucionList.jsp");
-            }
-
         } catch (Exception ex) {
             if (ajax) {
                 resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
                 resp.getWriter().print(ex.getMessage());
             } else {
-                req.getSession().setAttribute("error", ex.getMessage());
+                req.getSession().setAttribute(FLASH_SALIDA, "Error: " + ex.getMessage());
                 resp.sendRedirect(ctx + "/jsp/distribucion/distribucionList.jsp");
             }
         }
@@ -161,6 +205,6 @@ public class DistribucionServlet extends HttpServlet {
     /* ------------------------------ helper ----------------------------- */
     /** Escapa comillas y backslash para JSON simple. */
     private static String escape(String s) {
-        return s == null ? "" : s.replace("\\","\\\\").replace("\"","\\\"");
+        return s == null ? "" : s.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 }
