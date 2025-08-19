@@ -191,38 +191,38 @@ public class DistribucionDAO {
     /* ===================================================== */
 
     /** Repartidores que registraron al menos una salida ese día. */
-    public List<DistribucionResumen> repartidoresConSalida(LocalDate fecha)
-            throws SQLException {
+   public List<DistribucionResumen> repartidoresConSalida(LocalDate fecha) throws SQLException {
+    String sql = """
+        SELECT MIN(d.id_distribucion) AS id_distribucion,
+               r.id_repartidor,
+               TRIM(CONCAT(r.nombre_repartidor,' ',IFNULL(r.apellido_repartidor,''))) AS nombre_repartidor
+          FROM distribucion d
+          JOIN repartidores r USING(id_repartidor)
+         WHERE d.fecha_distribucion >= ?
+           AND d.fecha_distribucion <  ?
+         GROUP BY r.id_repartidor, r.nombre_repartidor, r.apellido_repartidor
+         ORDER BY nombre_repartidor
+    """;
 
-        String sql = """
-            SELECT MIN(d.id_distribucion) AS id_distribucion,
-                   r.id_repartidor,
-                   r.nombre_repartidor
-              FROM distribucion d
-              JOIN repartidores r USING(id_repartidor)
-             WHERE d.fecha_distribucion >= ?
-               AND d.fecha_distribucion <  ?
-             GROUP BY r.id_repartidor, r.nombre_repartidor
-        """;
+    List<DistribucionResumen> lista = new ArrayList<>();
+    try (Connection cn = getConn();
+         PreparedStatement ps = cn.prepareStatement(sql)) {
 
-        List<DistribucionResumen> lista = new ArrayList<>();
-        try (Connection cn = getConn();
-             PreparedStatement ps = cn.prepareStatement(sql)) {
+        ps.setTimestamp(1, Timestamp.valueOf(fecha.atStartOfDay()));
+        ps.setTimestamp(2, Timestamp.valueOf(fecha.plusDays(1).atStartOfDay()));
 
-            ps.setTimestamp(1, Timestamp.valueOf(fecha.atStartOfDay()));
-            ps.setTimestamp(2, Timestamp.valueOf(fecha.plusDays(1).atStartOfDay()));
-
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    lista.add(new DistribucionResumen(
-                            rs.getInt("id_distribucion"),
-                            rs.getInt("id_repartidor"),
-                            rs.getString("nombre_repartidor")));
-                }
+        try (ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                lista.add(new DistribucionResumen(
+                        rs.getInt("id_distribucion"),
+                        rs.getInt("id_repartidor"),
+                        rs.getString("nombre_repartidor")   // ← viene “Nombre Apellido”
+                ));
             }
         }
-        return lista;
     }
+    return lista;
+}
 
     /** Inventario pendiente (>0) del repartidor en la fecha dada. */
     public List<InventarioDTO> inventarioPendiente(int idRepartidor,

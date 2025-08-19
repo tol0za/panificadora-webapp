@@ -4,8 +4,6 @@
 <html>
 <head>
   <title>Repartidores del día</title>
-
-  <!-- Bootstrap -->
   <link  href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body data-ctx="${pageContext.request.contextPath}">
@@ -19,15 +17,35 @@
     <c:otherwise>
       <div class="table-responsive">
         <table class="table table-hover align-middle" id="tblReps">
-          <thead class="table-light"><tr><th>Repartidor</th></tr></thead>
+          <thead class="table-light">
+            <tr><th>Repartidor</th></tr>
+          </thead>
           <tbody>
-            <c:forEach items="${listaRepartidores}" var="r" varStatus="s">
-                <tr role="button" title="Seleccionar"
+
+            <c:forEach items="${listaRepartidores}" var="r">
+              <%-- 1) Nombre base (seguro) --%>
+              <c:set var="nom" value="${r.nombreRepartidor}" />
+
+              <%-- 2) Apellido (opcional): probamos varios nombres de propiedad sin romper --%>
+              <c:set var="ap" value=""/>
+              <c:catch var="e1"><c:set var="ap" value="${r.apellidoRepartidor}"/></c:catch>
+             
+
+              <tr role="button" title="Seleccionar"
                   onclick="location.href='${pageContext.request.contextPath}/NotaVentaServlet?inFrame=1&accion=vistaRepartidor&id=${r.idRepartidor}'">
-                
-                <td>${r.nombreRepartidor}</td>
+                <td>
+                  <c:choose>
+                    <c:when test="${not empty ap}">
+                      <c:out value="${nom}"/> <c:out value="${ap}"/>
+                    </c:when>
+                    <c:otherwise>
+                      <c:out value="${nom}"/>
+                    </c:otherwise>
+                  </c:choose>
+                </td>
               </tr>
             </c:forEach>
+
           </tbody>
         </table>
       </div>

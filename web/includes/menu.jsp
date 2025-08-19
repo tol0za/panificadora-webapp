@@ -73,7 +73,7 @@
   </a>
 </li>
     <!-- Salidas (Administrador y Empleado) -->
-    <li class="nav-item">
+  <!--  <li class="nav-item">
       <a class="nav-link"
          href="${pageContext.request.contextPath}/SalidaServlet"
          draggable="false"
@@ -81,7 +81,15 @@
         <i class="bi bi-arrow-up-square"></i> Salidas
       </a>
     </li>
-
+-->
+<!-- Sección INVENTARIO / DISTRIBUCIÓN -->
+<li class="nav-item">
+  <a class="nav-link d-flex align-items-center"
+     href="${pageContext.request.contextPath}/jsp/distribucion/distribucionList.jsp"
+     target="contentFrame">
+    <i class="bi bi-truck me-2"></i><span>Salidas Distribución</span>
+  </a>
+</li>
     <!-- Notas de Venta (Administrador y Empleado) -->
     <li class="nav-item">
       <a class="nav-link"
@@ -92,14 +100,14 @@
       </a>
     </li>
  
-<!-- Sección INVENTARIO / DISTRIBUCIÓN -->
 <li class="nav-item">
-  <a class="nav-link d-flex align-items-center"
-     href="${pageContext.request.contextPath}/jsp/distribucion/distribucionList.jsp"
+  <a class="nav-link"
+     href="${pageContext.request.contextPath}/NotaVentaServlet?inFrame=1&accion=historial"
      target="contentFrame">
-    <i class="bi bi-truck me-2"></i><span>Salidas Distribución</span>
+    <i class="bi bi-calendar3"></i> Historial de Notas
   </a>
 </li>
+
   </ul>
 </nav>
 

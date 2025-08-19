@@ -5,13 +5,11 @@ import dto.DistribucionResumen;
 import dto.InventarioDTO;
 import modelo.DetalleNotaVenta;
 import modelo.NotaVenta;
-
 import com.google.gson.*;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.*;
-
 import java.io.IOException;
 import java.sql.SQLException;
 import java.time.LocalDate;
@@ -35,7 +33,9 @@ import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.VerticalAlignment;
 
 /** Controlador principal del módulo de Notas de Venta */
+
 public class NotaVentaServlet extends HttpServlet {
+
     /* ============ DAOs ============ */
     private NotaVentaDAO             notaDAO;
     private DetalleNotaDAO           detalleDAO;
@@ -48,30 +48,34 @@ public class NotaVentaServlet extends HttpServlet {
     private RutaCierreDAO            rutaDAO;        // ← NUEVO
 
     /* ============ Acciones ============ */
-    private static final String ACC_REPARTIDORES     = "repartidores";
-    private static final String ACC_VISTA_REPARTIDOR = "vistaRepartidor";
-    private static final String ACC_GUARDAR          = "guardarNota";
-    private static final String ACC_EDITAR_FORM      = "editarNota";
-    private static final String ACC_ACTUALIZAR       = "actualizarNota";
-    private static final String ACC_ELIMINAR         = "eliminarNota";
-    private static final String ACC_CERRAR_RUTA      = "cerrarRuta";
-    private static final String ACC_REABRIR_RUTA     = "reabrirRuta";   // ← NUEVO
-    private static final String ACC_FOLIO_CHECK      = "folioCheck";
-    private static final String ACC_DETALLE_JSON     = "detalleJson";
-    private static final String ACC_IMPRIMIR_DIA     = "imprimirNotasDia"; // ← igual que en la URL
+    private static final String ACC_REPARTIDORES      = "repartidores";
+    private static final String ACC_VISTA_REPARTIDOR  = "vistaRepartidor";
+    private static final String ACC_GUARDAR           = "guardarNota";
+    private static final String ACC_EDITAR_FORM       = "editarNota";
+    private static final String ACC_ACTUALIZAR        = "actualizarNota";
+    private static final String ACC_ELIMINAR          = "eliminarNota";
+    private static final String ACC_CERRAR_RUTA       = "cerrarRuta";
+    private static final String ACC_REABRIR_RUTA      = "reabrirRuta";        // ← NUEVO
+    private static final String ACC_FOLIO_CHECK       = "folioCheck";
+    private static final String ACC_DETALLE_JSON      = "detalleJson";
+    private static final String ACC_IMPRIMIR_DIA      = "imprimirNotasDia";   // ← NUEVO
+
+    // Historial por fechas (NUEVO)
+    private static final String ACC_HISTORIAL         = "historial";
+    private static final String ACC_HIST_BUSCAR       = "histBuscar";
 
     /* ============ init ============ */
     @Override public void init() throws ServletException {
         try {
-            notaDAO        = new NotaVentaDAO();
-            detalleDAO     = new DetalleNotaDAO();
-            invRepDAO      = new InventarioRepartidorDAO();
-            invGlobalDAO   = new InventarioEmpaquetadoDAO();
-            distribucionDAO= new DistribucionDAO();
-            repartidorDAO  = new RepartidorDAO();
-            tiendaDAO      = new TiendaDAO();
-            empaqueDAO     = new CatalogoEmpaqueDAO();
-            rutaDAO        = new RutaCierreDAO(); // ← NUEVO
+            notaDAO         = new NotaVentaDAO();
+            detalleDAO      = new DetalleNotaDAO();
+            invRepDAO       = new InventarioRepartidorDAO();
+            invGlobalDAO    = new InventarioEmpaquetadoDAO();
+            distribucionDAO = new DistribucionDAO();
+            repartidorDAO   = new RepartidorDAO();
+            tiendaDAO       = new TiendaDAO();
+            empaqueDAO      = new CatalogoEmpaqueDAO();
+            rutaDAO         = new RutaCierreDAO(); // ← NUEVO
         } catch (SQLException e) {
             throw new ServletException("Error al inicializar DAOs", e);
         }
@@ -127,18 +131,24 @@ public class NotaVentaServlet extends HttpServlet {
         /* ---------------- flujo principal ---------------- */
         String acc = req.getParameter("accion");
         if (acc == null) acc = ACC_REPARTIDORES;
+
         try {
             switch (acc) {
-                case ACC_REPARTIDORES     -> repartidoresHoy(req,res);
-                case ACC_VISTA_REPARTIDOR -> vistaRepartidor(req,res);
-                case ACC_GUARDAR          -> guardarNota(req,res);
-                case ACC_EDITAR_FORM      -> editarForm(req,res);
-                case ACC_ACTUALIZAR       -> actualizarNota(req,res);
-                case ACC_ELIMINAR         -> eliminarNota(req,res);
-                case ACC_CERRAR_RUTA      -> cerrarRuta(req,res);
-                case ACC_REABRIR_RUTA     -> reabrirRuta(req,res);     // ← NUEVO
-                case ACC_IMPRIMIR_DIA     -> imprimirNotasDia(req,res); // ← NUEVO
-                default                   -> repartidoresHoy(req,res);
+                case ACC_REPARTIDORES      -> repartidoresHoy(req,res);
+                case ACC_VISTA_REPARTIDOR  -> vistaRepartidor(req,res);
+                case ACC_GUARDAR           -> guardarNota(req,res);
+                case ACC_EDITAR_FORM       -> editarForm(req,res);
+                case ACC_ACTUALIZAR        -> actualizarNota(req,res);
+                case ACC_ELIMINAR          -> eliminarNota(req,res);
+                case ACC_CERRAR_RUTA       -> cerrarRuta(req,res);
+                case ACC_REABRIR_RUTA      -> reabrirRuta(req,res);
+                case ACC_IMPRIMIR_DIA      -> imprimirNotasDia(req,res);
+
+                // Historial por fechas (NUEVO)
+                case ACC_HISTORIAL         -> historial(req,res);
+                case ACC_HIST_BUSCAR       -> histBuscar(req,res);
+
+                default                    -> repartidoresHoy(req,res);
             }
         } catch (SQLException e) {
             throw new ServletException(e);
@@ -166,7 +176,8 @@ public class NotaVentaServlet extends HttpServlet {
         LocalDate hoy = LocalDate.now();
 
         List<InventarioDTO> inventario = distribucionDAO.inventarioPendiente(idRep, hoy);
-        List<NotaVenta> notas = notaDAO.listarPorRepartidorYFecha(idRep, hoy);
+        List<NotaVenta>     notas      = notaDAO.listarPorRepartidorYFecha(idRep, hoy);
+
         double totalDia = 0;
         for (NotaVenta n : notas) {
             n.setNombreTienda(tiendaDAO.buscarPorId(n.getIdTienda()).getNombre());
@@ -183,7 +194,6 @@ public class NotaVentaServlet extends HttpServlet {
         req.setAttribute("tiendas",        tiendaDAO.listarTodas());
         req.setAttribute("hoy",            hoy);
 
-        // Estado REAL de la ruta (no por "restante")
         boolean rutaCerrada = rutaDAO.estaCerrada(idRep, hoy);   // ← NUEVO
         req.setAttribute("rutaCerrada", rutaCerrada);
 
@@ -200,7 +210,6 @@ public class NotaVentaServlet extends HttpServlet {
         int idRep     = Integer.parseInt(req.getParameter("id_repartidor"));
         int idTienda  = Integer.parseInt(req.getParameter("id_tienda"));
 
-        // Bloqueo si ruta cerrada
         if (rutaDAO.estaCerrada(idRep, LocalDate.now())) {            // ← NUEVO
             req.getSession().setAttribute("flashMsg", "Ruta cerrada. Reábrela para agregar notas.");
             res.sendRedirect(req.getContextPath()
@@ -208,7 +217,6 @@ public class NotaVentaServlet extends HttpServlet {
             return;
         }
 
-        /* folio duplicado */
         if (notaDAO.folioExiste(folio)) {
             req.getSession().setAttribute("flashMsg",
                 "El folio <strong>" + folio + "</strong> ya existe");
@@ -217,7 +225,6 @@ public class NotaVentaServlet extends HttpServlet {
             return;
         }
 
-        /* 1. inserta encabezado vacío */
         NotaVenta n = new NotaVenta();
         n.setFolio(folio);
         n.setIdRepartidor(idRep);
@@ -226,7 +233,6 @@ public class NotaVentaServlet extends HttpServlet {
         n.setTotal(0);
         int idNota = notaDAO.insertar(n);
 
-        /* 2. parsea detalle y descuenta inventario (del repartidor) */
         List<DetalleNotaVenta> lineas =
                 parseDetalleJSON(req.getParameter("lineas"), idNota);
         try {
@@ -235,8 +241,7 @@ public class NotaVentaServlet extends HttpServlet {
                 invRepDAO.descontar(idRep, d.getIdEmpaque(), piezas);  // valida stock
                 detalleDAO.insertar(d);
             }
-        } catch (SQLException ex) {                 // stock insuficiente
-            /* revierte encabezado en caso de error */
+        } catch (SQLException ex) {
             notaDAO.eliminar(idNota);
             req.getSession().setAttribute("flashMsg",
                 "<strong>Stock insuficiente</strong>: " + ex.getMessage());
@@ -245,7 +250,6 @@ public class NotaVentaServlet extends HttpServlet {
             return;
         }
 
-        /* 3. totaliza y responde OK */
         notaDAO.actualizarTotal(idNota);
         req.getSession().setAttribute("flashMsg", "Nota guardada");
         res.sendRedirect(req.getContextPath()
@@ -260,6 +264,7 @@ public class NotaVentaServlet extends HttpServlet {
         int idNota = Integer.parseInt(req.getParameter("id"));
         NotaVenta n = notaDAO.obtener(idNota);
         if (n == null){ repartidoresHoy(req,res); return; }
+
         List<DetalleNotaVenta> det = detalleDAO.listarPorNota(idNota);
         for (DetalleNotaVenta d : det) {
             d.setNombreEmpaque(
@@ -267,11 +272,13 @@ public class NotaVentaServlet extends HttpServlet {
         }
         LocalDate hoy = LocalDate.now();
         List<InventarioDTO> invPend = distribucionDAO.inventarioPendiente(n.getIdRepartidor(), hoy);
+
         req.setAttribute("nota",           n);
         req.setAttribute("detalle",        det);
         req.setAttribute("inventario",     invPend);
         req.setAttribute("inventarioJson", toJson(invPend));
         req.setAttribute("tiendas",        tiendaDAO.listarTodas());
+
         forwardVista(req,res,"jsp/notas/NotaFormEditar.jsp");
     }
 
@@ -288,7 +295,6 @@ public class NotaVentaServlet extends HttpServlet {
         NotaVenta n = notaDAO.obtener(idNota);
         if (n == null) { repartidoresHoy(req, res); return; }
 
-        // Bloqueo si ruta cerrada
         if (rutaDAO.estaCerrada(n.getIdRepartidor(), LocalDate.now())) {   // ← NUEVO
             req.getSession().setAttribute("flashMsg", "Ruta cerrada. Reábrela para editar notas.");
             res.sendRedirect(req.getContextPath()
@@ -296,7 +302,6 @@ public class NotaVentaServlet extends HttpServlet {
             return;
         }
 
-        /* folio duplicado */
         if (n.getFolio() != folio && notaDAO.folioExiste(folio)) {
             req.getSession().setAttribute("flashMsg",
                 "El folio <strong>" + folio + "</strong> ya existe");
@@ -305,15 +310,13 @@ public class NotaVentaServlet extends HttpServlet {
             return;
         }
 
-        /* 1. Revertir inventario anterior SOLO al repartidor */
+        // Revertir inventario anterior SOLO al repartidor
         for (DetalleNotaVenta d : detalleDAO.listarPorNota(idNota)) {
             int piezas = d.getCantidadVendida() + d.getMerma();
             invRepDAO.devolver(n.getIdRepartidor(), d.getIdEmpaque(), piezas);
-            // ❌ NO tocar inventario global aquí
         }
         detalleDAO.eliminarPorNota(idNota);
 
-        /* 2. Insertar nuevos detalles (descontar del repartidor) */
         try {
             for (DetalleNotaVenta d
                     : parseDetalleJSON(req.getParameter("lineas"), idNota)) {
@@ -321,7 +324,7 @@ public class NotaVentaServlet extends HttpServlet {
                 invRepDAO.descontar(n.getIdRepartidor(), d.getIdEmpaque(), piezas);
                 detalleDAO.insertar(d);
             }
-        } catch (SQLException ex) {                 // stock insuficiente
+        } catch (SQLException ex) {
             req.getSession().setAttribute("flashMsg",
                 "<strong>Stock insuficiente</strong>: " + ex.getMessage());
             res.sendRedirect(req.getContextPath()
@@ -329,11 +332,11 @@ public class NotaVentaServlet extends HttpServlet {
             return;
         }
 
-        /* 3. Actualizar encabezado y total */
         n.setFolio(folio);
         n.setIdTienda(idTienda);
         notaDAO.actualizar(n);
         notaDAO.actualizarTotal(idNota);
+
         req.getSession().setAttribute("flashMsg", "Nota actualizada");
         res.sendRedirect(req.getContextPath()
             + "/NotaVentaServlet?inFrame=1&accion=vistaRepartidor&id=" + n.getIdRepartidor());
@@ -348,7 +351,6 @@ public class NotaVentaServlet extends HttpServlet {
         NotaVenta n = notaDAO.obtener(idNota);
         if (n == null){ repartidoresHoy(req,res); return; }
 
-        // Bloqueo si ruta cerrada
         if (rutaDAO.estaCerrada(n.getIdRepartidor(), LocalDate.now())) {   // ← NUEVO
             req.getSession().setAttribute("flashMsg",
                     "Ruta cerrada. Reábrela para eliminar notas.");
@@ -359,7 +361,6 @@ public class NotaVentaServlet extends HttpServlet {
 
         for (DetalleNotaVenta d : detalleDAO.listarPorNota(idNota)) {
             int piezas = d.getCantidadVendida() + d.getMerma();
-            // Solo devolvemos al inventario del repartidor
             invRepDAO.devolver(n.getIdRepartidor(), d.getIdEmpaque(), piezas);
         }
         detalleDAO.eliminarPorNota(idNota);
@@ -379,15 +380,11 @@ public class NotaVentaServlet extends HttpServlet {
         int       idRep = Integer.parseInt(req.getParameter("id_repartidor"));
         LocalDate hoy   = LocalDate.now();
 
-        /* 1 · Agrupa el sobrante por id_empaque ------------- */
-        Map<Integer,Integer> mapSobrante = new HashMap<>();  // <idEmpaque, piezas>
+        Map<Integer,Integer> mapSobrante = new HashMap<>();
         for (InventarioDTO inv : distribucionDAO.inventarioPendiente(idRep, hoy)) {
-            mapSobrante.merge(inv.getIdEmpaque(),
-                              inv.getRestante(),       // suma si ya existe
-                              Integer::sum);
+            mapSobrante.merge(inv.getIdEmpaque(), inv.getRestante(), Integer::sum);
         }
 
-        /* 2 · Devuelve al stock global y pone restante = 0 --- */
         for (var e : mapSobrante.entrySet()) {
             int idEmp  = e.getKey();
             int piezas = e.getValue();
@@ -396,11 +393,8 @@ public class NotaVentaServlet extends HttpServlet {
             invRepDAO.consumirRestante(idRep, idEmp, piezas);        // dejar en 0
         }
 
-        // Marca estado: CERRADA
         rutaDAO.cerrar(idRep, hoy);                            // ← NUEVO
-
-        req.getSession().setAttribute(
-            "flashMsg", "Ruta cerrada y sobrante devuelto");
+        req.getSession().setAttribute("flashMsg", "Ruta cerrada y sobrante devuelto");
         res.sendRedirect(req.getContextPath()
                 + "/NotaVentaServlet?inFrame=1&accion=vistaRepartidor&id=" + idRep);
     }
@@ -414,29 +408,55 @@ public class NotaVentaServlet extends HttpServlet {
         int       idRep = Integer.parseInt(req.getParameter("id_repartidor"));
         LocalDate hoy   = LocalDate.now();
 
-        /* 1· retornos registrados al cerrar */
         Map<Integer,Integer> devoluciones =
                 invGlobalDAO.obtenerRetornoPorRepartidorYFecha(idRep, hoy); // <idEmp, piezas>
 
-        /* 2· quita de inventario global y repone al repartidor */
         for (var e : devoluciones.entrySet()) {
             int idEmp   = e.getKey();
             int piezas  = e.getValue();
             if (piezas == 0) continue;
-            // registramos la SALIDA inversa → cantidad NEGATIVA
-            invGlobalDAO.registrarMovimientoSalida(
-                    idEmp, piezas, 0, idRep, "REABRIR_RUTA");
-            // devolvemos esas piezas al inventario del repartidor
+            invGlobalDAO.registrarMovimientoSalida(idEmp, piezas, 0, idRep, "REABRIR_RUTA");
             invRepDAO.insertarInicial(idRep, idEmp, piezas);
         }
 
-        // Marca estado: ABIERTA
         rutaDAO.reabrir(idRep, hoy);                           // ← NUEVO
-
-        req.getSession().setAttribute("flashMsg",
-                "Ruta reabierta: puedes capturar notas.");
+        req.getSession().setAttribute("flashMsg","Ruta reabierta: puedes capturar notas.");
         res.sendRedirect(req.getContextPath()
                 + "/NotaVentaServlet?inFrame=1&accion=vistaRepartidor&id=" + idRep);
+    }
+
+    /* =============================================================
+     * 9. Historial por fechas (NUEVO)
+     * =========================================================== */
+    private void historial(HttpServletRequest req, HttpServletResponse res)
+            throws ServletException, IOException {
+        LocalDate hoy = LocalDate.now();
+        req.setAttribute("desde", hoy.minusDays(6).toString());
+        req.setAttribute("hasta", hoy.toString());
+        forwardVista(req, res, "jsp/notas/historialNotas.jsp");
+    }
+
+    private void histBuscar(HttpServletRequest req, HttpServletResponse res)
+            throws ServletException, IOException, SQLException {
+        LocalDate desde = parseOr(LocalDate.now().minusDays(6), req.getParameter("desde"));
+        LocalDate hasta = parseOr(LocalDate.now(),              req.getParameter("hasta"));
+
+        var lista  = notaDAO.listarPorRango(desde, hasta);
+        var diario = notaDAO.resumenDiario(desde, hasta);
+        var reps   = notaDAO.resumenPorRepartidor(desde, hasta);
+
+        req.setAttribute("desde", desde.toString());
+        req.setAttribute("hasta", hasta.toString());
+        req.setAttribute("listaNotas",    lista);
+        req.setAttribute("resumenDiario", diario);
+        req.setAttribute("resumenReps",   reps);
+
+        forwardVista(req, res, "jsp/notas/historialNotas.jsp");
+    }
+
+    private LocalDate parseOr(LocalDate fallback, String s){
+        try { return (s==null || s.isBlank()) ? fallback : LocalDate.parse(s); }
+        catch (Exception e){ return fallback; }
     }
 
     /* =============================================================
@@ -460,13 +480,13 @@ public class NotaVentaServlet extends HttpServlet {
     }
 
     /* ---------------------------------------------------------------
-     *  Imprime TODAS las notas del día para un repartidor  (iText 7.2.6)
-     *  URL: …/NotaVentaServlet?accion=imprimirNotasDia&id_repartidor=##
+     * 10. Imprime TODAS las notas del día para un repartidor (iText)
+     *     URL: …/NotaVentaServlet?accion=imprimirNotasDia&id_repartidor=##
      * ------------------------------------------------------------- */
     private void imprimirNotasDia(HttpServletRequest req,
                                   HttpServletResponse  res)
             throws ServletException, IOException {
-        /* -------- validar parámetros -------- */
+
         String repStr = req.getParameter("id_repartidor");
         if (repStr == null || repStr.isBlank()) {
             res.sendError(400, "Falta parámetro id_repartidor");
@@ -474,14 +494,13 @@ public class NotaVentaServlet extends HttpServlet {
         }
         int idRep = Integer.parseInt(repStr);
         try {
-            /* -------- obtener todas las notas de HOY -------- */
             LocalDate hoy = LocalDate.now();
             List<NotaVenta> notas = notaDAO.listarPorRepartidorYFecha(idRep, hoy);
             if (notas.isEmpty()) {
                 res.sendError(404, "No hay notas para imprimir");
                 return;
             }
-            /* -------- preparar PDF -------- */
+
             res.setContentType("application/pdf");
             res.setHeader("Content-Disposition",
                           "inline; filename=notas_rep_" + idRep + "_" + hoy + ".pdf");
@@ -490,7 +509,6 @@ public class NotaVentaServlet extends HttpServlet {
             PdfDocument pdf = new PdfDocument(wr);
             Document    doc = new Document(pdf);
 
-            /* ---- encabezado genérico una sola vez ---- */
             Image logo = new Image(ImageDataFactory.create(
                     req.getServletContext().getRealPath("/static/img/logo_pdf.png")))
                     .scaleToFit(90, 90);
@@ -510,30 +528,27 @@ public class NotaVentaServlet extends HttpServlet {
             cab.addCell(new Cell().add(datosEmp).setBorder(Border.NO_BORDER));
             doc.add(cab).add(new Paragraph("\n"));
 
-            /* -------- recorrer notas -------- */
             double granTotal = 0;
             for (NotaVenta nota : notas) {
-                /* título de nota */
                 doc.add(new Paragraph("NOTA DE VENTA  #" + nota.getFolio())
                         .setTextAlignment(TextAlignment.CENTER)
                         .setFontSize(12)
                         .setBold());
-                /* datos tienda / hora */
+
                 doc.add(new Paragraph()
                         .add("Tienda: ")
                         .add(tiendaDAO.buscarPorId(nota.getIdTienda()).getNombre())
                         .add("\nFecha: " + nota.getFechaNota())
                         .setMarginBottom(6));
 
-                /* detalle */
                 List<DetalleNotaVenta> det =
                         detalleDAO.listarPorNota(nota.getIdNotaVenta());
                 for (DetalleNotaVenta d : det) {
                     d.setNombreEmpaque(
                             empaqueDAO.buscarPorId(d.getIdEmpaque()).getNombreEmpaque());
                 }
-                Table tbl = new Table(new float[]{5,2,2,2})
-                        .useAllAvailableWidth();
+
+                Table tbl = new Table(new float[]{5,2,2,2}).useAllAvailableWidth();
                 tbl.addHeaderCell(header("Empaque"));
                 tbl.addHeaderCell(header("Vendidos"));
                 tbl.addHeaderCell(header("Merma"));
@@ -554,13 +569,11 @@ public class NotaVentaServlet extends HttpServlet {
                         .setMarginBottom(10));
                 granTotal += total;
 
-                /* separador entre notas (salvo la última) */
                 if (nota != notas.get(notas.size()-1)) {
                     doc.add(new Paragraph("\n").setBorderTop(new SolidBorder(0.5f)));
                 }
             }
 
-            /* ---- total del día ---- */
             doc.add(new Paragraph("TOTAL DEL DÍA: $ " + String.format("%.2f", granTotal))
                     .setTextAlignment(TextAlignment.RIGHT)
                     .setFontSize(13)
@@ -571,6 +584,7 @@ public class NotaVentaServlet extends HttpServlet {
             throw new ServletException("No se pudo generar el PDF", e);
         }
     }
+
     /* Helpers abreviados */
     private Cell header(String txt){
         return new Cell().add(new Paragraph(txt))
