@@ -19,12 +19,12 @@
     <c:otherwise>
       <div class="table-responsive">
         <table class="table table-hover align-middle" id="tblReps">
-          <thead class="table-light"><tr><th>#</th><th>Repartidor</th></tr></thead>
+          <thead class="table-light"><tr><th>Repartidor</th></tr></thead>
           <tbody>
             <c:forEach items="${listaRepartidores}" var="r" varStatus="s">
-              <tr role="button"
+                <tr role="button" title="Seleccionar"
                   onclick="location.href='${pageContext.request.contextPath}/NotaVentaServlet?inFrame=1&accion=vistaRepartidor&id=${r.idRepartidor}'">
-                <td>${s.index + 1}</td>
+                
                 <td>${r.nombreRepartidor}</td>
               </tr>
             </c:forEach>

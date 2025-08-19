@@ -1,7 +1,6 @@
 package dao;
 
 import conexion.Conexion;
-import modelo.InventarioEmpaquetado;
 import dto.DistribucionFilaDTO;
 import dto.DistribucionResumen;
 import dto.InventarioDTO;
@@ -16,14 +15,46 @@ import java.util.*;
  * DAO de la tabla <code>distribucion</code>.
  * Mantiene los métodos históricos y añade la lógica necesaria para
  * Salidas de Distribución y Notas de Venta.
+ *
+ * Regla: todos los movimientos de bodega se realizan a través del
+ * SP `sp_mov_inventario_bodega` para evitar duplicidades y validar stock.
  */
 public class DistribucionDAO {
 
     /* ----------------------------------------------------- */
-    /*  Utilidad                                             */
+    /*  Conexión                                             */
     /* ----------------------------------------------------- */
     private Connection getConn() throws SQLException {
         return Conexion.getConnection();
+    }
+
+    /* Soporte opcional para beginTx/commitTx/rollbackTx (compatibilidad) */
+    private Connection txConn;
+
+    public void beginTx() throws SQLException {
+        if (txConn != null) return;      // ya abierta
+        txConn = getConn();
+        txConn.setAutoCommit(false);
+    }
+    public void commitTx() throws SQLException {
+        if (txConn == null) return;
+        try {
+            txConn.commit();
+        } finally {
+            try { txConn.setAutoCommit(true); } catch (SQLException ignore) {}
+            try { txConn.close(); } catch (SQLException ignore) {}
+            txConn = null;
+        }
+    }
+    public void rollbackTx() {
+        if (txConn == null) return;
+        try {
+            txConn.rollback();
+        } catch (SQLException ignore) {
+        } finally {
+            try { txConn.close(); } catch (SQLException ignore) {}
+            txConn = null;
+        }
     }
 
     /* ===================================================== */
@@ -33,7 +64,7 @@ public class DistribucionDAO {
     /** Devuelve TODAS las filas de un repartidor en una fecha concreta. */
     public List<Distribucion> buscarPorRepartidorYFecha(int idRepartidor,
                                                         LocalDate fecha)
-                                                        throws SQLException {
+            throws SQLException {
 
         String sql = """
             SELECT * FROM distribucion
@@ -55,6 +86,39 @@ public class DistribucionDAO {
         return lista;
     }
 
+    /** Holder liviano para una fila de 'distribucion' (edición). */
+    public static final class FilaDistrib {
+        public final int idEmpaque;
+        public final int idRepartidor;
+        public final int cantidad;
+        public FilaDistrib(int idEmpaque, int idRepartidor, int cantidad) {
+            this.idEmpaque = idEmpaque;
+            this.idRepartidor = idRepartidor;
+            this.cantidad = cantidad;
+        }
+    }
+
+    /** Obtiene datos básicos de una fila por su id (para flujos de edición). */
+    public FilaDistrib obtenerDistribucionPorId(int idDistribucion) throws SQLException {
+        final String sql = """
+            SELECT id_empaque, id_repartidor, cantidad
+              FROM distribucion
+             WHERE id_distribucion = ?
+        """;
+        try (Connection cn = getConn();
+             PreparedStatement ps = cn.prepareStatement(sql)) {
+            ps.setInt(1, idDistribucion);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) return null;
+                return new FilaDistrib(
+                        rs.getInt("id_empaque"),
+                        rs.getInt("id_repartidor"),
+                        rs.getInt("cantidad")
+                );
+            }
+        }
+    }
+
     /** Obtiene la última salida registrada de un repartidor. */
     public Distribucion obtenerUltimaDistribucionPorRepartidor(int idRepartidor)
             throws SQLException {
@@ -68,7 +132,6 @@ public class DistribucionDAO {
 
         try (Connection cn = getConn();
              PreparedStatement ps = cn.prepareStatement(sql)) {
-
             ps.setInt(1, idRepartidor);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? mapRow(rs) : null;
@@ -80,10 +143,7 @@ public class DistribucionDAO {
     /*  NUEVO — Listar por fecha (DTO con nombres)           */
     /* ===================================================== */
 
-    /**
-     * Devuelve la lista completa de salidas de la fecha dada,
-     * incluyendo nombres de repartidor y empaque.
-     */
+    /** Lista completa de salidas de la fecha dada (con nombres de rep/empaque). */
     public List<DistribucionFilaDTO> listarPorFecha(LocalDate fecha) throws SQLException {
 
         String sql = """
@@ -167,7 +227,7 @@ public class DistribucionDAO {
     /** Inventario pendiente (>0) del repartidor en la fecha dada. */
     public List<InventarioDTO> inventarioPendiente(int idRepartidor,
                                                    LocalDate fecha)
-                                                   throws SQLException {
+            throws SQLException {
 
         String sql = """
             SELECT d.id_distribucion,
@@ -215,179 +275,210 @@ public class DistribucionDAO {
     /*  NUEVOS MÉTODOS – Salidas / Inventario                */
     /* ===================================================== */
 
-    /** Inserta la salida (múltiples líneas) y ajusta inventario. */
-  /* ===============================================================
- *  Inserta la salida completa y ajusta inventarios
- * ===============================================================*/
+    /**
+     * Inserta la salida completa (múltiples líneas) y ajusta inventarios.
+     * Hace UN solo movimiento en bodega por línea vía SP (evita doble descuento).
+     */
+    public void crearSalida(int idRepartidor,
+                            Map<Integer, Integer> lineas) throws Exception {
 
-/* ==============================================================
- *  DistribucionDAO  –  crearSalida SIN duplicar movimientos
- * ============================================================== */
-public void crearSalida(int idRepartidor,
-                        Map<Integer,Integer> lineas) throws Exception {
+        String sqlIns = """
+            INSERT INTO distribucion(id_repartidor,id_empaque,cantidad,fecha_distribucion)
+            VALUES (?,?,?,NOW())
+        """;
 
-    String sqlIns = """
-        INSERT INTO distribucion(id_repartidor,id_empaque,cantidad,fecha_distribucion)
-        VALUES (?,?,?,NOW())
-    """;
+        try (Connection cn = getConn();
+             PreparedStatement psIns = cn.prepareStatement(sqlIns, Statement.RETURN_GENERATED_KEYS)) {
 
-    try (Connection cn = getConn();
-         PreparedStatement ps = cn.prepareStatement(sqlIns)) {
+            cn.setAutoCommit(false);
+            try {
+                for (Map.Entry<Integer, Integer> e : lineas.entrySet()) {
+                    int idEmp = e.getKey();
+                    int cant  = e.getValue();
+                    if (cant <= 0) continue;
 
-        InventarioEmpaquetadoDAO invDao = new InventarioEmpaquetadoDAO();
-        InventarioRepartidorDAO  repDao = new InventarioRepartidorDAO();
+                    // 1) Inserta la línea de salida
+                    psIns.setInt(1, idRepartidor);
+                    psIns.setInt(2, idEmp);
+                    psIns.setInt(3, cant);
+                    psIns.executeUpdate();
 
-        for (var e : lineas.entrySet()) {
-            int idEmp = e.getKey();
-            int cant  = e.getValue();
+                    int idDistrib = 0;
+                    try (ResultSet gk = psIns.getGeneratedKeys()) {
+                        if (gk.next()) idDistrib = gk.getInt(1);
+                    }
 
-            /* 1) ‑‑‑‑‑ Stock global de bodega (resta) */
-            int nuevoStock = invDao.restarInventarioBodega(idEmp, cant);
+                    // 2) Bodega: único movimiento (delta negativo). El SP valida stock.
+                    callSpMovBodega(cn, idEmp, -cant, "SALIDA_DISTRIBUCION", idRepartidor, idDistrib);
 
-            /* 2) ‑‑‑‑‑ Inventario del repartidor  (+)  ► crea movimiento */
-            repDao.sumarInventarioRepartidor(idRepartidor, idEmp, cant, nuevoStock);
-
-            /* 3) ‑‑‑‑‑ Registro principal en tabla distribucion */
-            ps.setInt(1, idRepartidor);
-            ps.setInt(2, idEmp);
-            ps.setInt(3, cant);
-            ps.addBatch();
-        }
-        ps.executeBatch();
-    }
-}
-/* =========================================================
- *  Ajustar cantidad de una línea ya registrada
- * =========================================================*/
-public void actualizarCantidad(int idDistribucion, int nuevaCantidad) throws Exception {
-
-    String sel = """
-        SELECT id_empaque, id_repartidor, cantidad
-          FROM distribucion
-         WHERE id_distribucion = ?
-    """;
-    String upd = """
-        UPDATE distribucion SET cantidad = ?
-         WHERE id_distribucion = ?
-    """;
-
-    try (Connection cn = getConn();
-         PreparedStatement psSel = cn.prepareStatement(sel);
-         PreparedStatement psUpd = cn.prepareStatement(upd)) {
-
-        psSel.setInt(1, idDistribucion);
-
-        int idEmp, idRep, anterior;
-        try (ResultSet rs = psSel.executeQuery()) {
-            if (!rs.next()) throw new SQLException("Distribución no encontrada");
-            idEmp    = rs.getInt("id_empaque");
-            idRep    = rs.getInt("id_repartidor");
-            anterior = rs.getInt("cantidad");
-        }
-
-        if (existeNotaVenta(idDistribucion))
-            throw new IllegalStateException("Ya existe nota de venta.");
-
-        int delta = nuevaCantidad - anterior;
-        if (delta != 0) {
-            InventarioEmpaquetadoDAO invDao = new InventarioEmpaquetadoDAO();
-            InventarioRepartidorDAO  repDao = new InventarioRepartidorDAO();
-
-            /* ---------- movimiento en bodega y reparto ---------- */
-            int nuevoStock;
-            String motivo;
-            if (delta > 0) {                                   // se entregan piezas extra
-                nuevoStock = invDao.restarInventarioBodega(idEmp, delta);
-                repDao.sumarInventarioRepartidor(idRep, idEmp, delta);
-                motivo = "AJUSTE_SALIDA";
-            } else {                                           // se devuelven piezas
-                nuevoStock = invDao.aumentarInventarioBodega(idEmp, -delta);
-                repDao.restarInventarioRepartidor(idRep, idEmp, -delta);
-                motivo = "AJUSTE_RETORNO";
-            }
-
-            /* ---------- registrar movimiento ---------- */
-            InventarioEmpaquetado mov = new InventarioEmpaquetado();
-            mov.setIdEmpaque(idEmp);
-            mov.setIdRepartidor(idRep);
-            mov.setIdDistribucion(idDistribucion);
-            mov.setCantidad(delta);                            // + / –
-            mov.setFecha(java.time.LocalDateTime.now());
-            mov.setMotivo(motivo);
-            mov.setCantidadActual(nuevoStock);
-            invDao.registrarMovimiento(mov);
-        }
-
-        /* actualizar tabla distribucion */
-        psUpd.setInt(1, nuevaCantidad);
-        psUpd.setInt(2, idDistribucion);
-        psUpd.executeUpdate();
-    }
-}
-
-/* =========================================================
- *  Eliminar por completo una salida (mismo repartidor-fecha)
- * =========================================================*/
-public void eliminarSalida(int idRepartidor, java.time.LocalDateTime fechaHora) throws Exception {
-
-    String sel = """
-        SELECT id_distribucion, id_empaque, cantidad
-          FROM distribucion
-         WHERE id_repartidor = ?
-           AND fecha_distribucion = ?
-    """;
-    String del = """
-        DELETE FROM distribucion
-         WHERE id_repartidor = ?
-           AND fecha_distribucion = ?
-    """;
-
-    try (Connection cn = getConn();
-         PreparedStatement psSel = cn.prepareStatement(sel);
-         PreparedStatement psDel = cn.prepareStatement(del)) {
-
-        psSel.setInt(1, idRepartidor);
-        psSel.setTimestamp(2, java.sql.Timestamp.valueOf(fechaHora));
-
-        InventarioEmpaquetadoDAO invDao = new InventarioEmpaquetadoDAO();
-        InventarioRepartidorDAO  repDao = new InventarioRepartidorDAO();
-
-        try (ResultSet rs = psSel.executeQuery()) {
-            while (rs.next()) {
-                int idDist = rs.getInt("id_distribucion");
-                if (existeNotaVenta(idDist))
-                    throw new IllegalStateException("Salida ligada a nota de venta.");
-
-                int idEmp = rs.getInt("id_empaque");
-                int cant  = rs.getInt("cantidad");
-
-                /* ---------- devolver a bodega ---------- */
-                int nuevoStock = invDao.aumentarInventarioBodega(idEmp, cant);    // (+)
-                repDao.restarInventarioRepartidor(idRepartidor, idEmp, cant);     // (–)
-
-                /* ---------- registrar retorno ---------- */
-                InventarioEmpaquetado mov = new InventarioEmpaquetado();
-                mov.setIdEmpaque(idEmp);
-                mov.setIdRepartidor(idRepartidor);
-                mov.setIdDistribucion(idDist);
-                mov.setCantidad(cant);                           // retorno ⇒ positivo
-                mov.setFecha(java.time.LocalDateTime.now());
-                mov.setMotivo("ENTRADA_RETORNO");
-                mov.setCantidadActual(nuevoStock);
-                invDao.registrarMovimiento(mov);
+                    // 3) Inventario del repartidor (+cant)
+                    upsertInventarioRepartidor(cn, idRepartidor, idEmp, +cant);
+                }
+                cn.commit();
+            } catch (Exception ex) {
+                try { cn.rollback(); } catch (SQLException ignore) {}
+                throw ex;
             }
         }
-
-        /* eliminar las filas de distribucion */
-        psDel.setInt(1, idRepartidor);
-        psDel.setTimestamp(2, java.sql.Timestamp.valueOf(fechaHora));
-        psDel.executeUpdate();
     }
-}
+
+    /**
+     * Ajusta la cantidad de una línea ya existente.
+     * delta > 0 => se entregan piezas extra (bodega -delta; rep +delta)
+     * delta < 0 => retorno (bodega +abs; rep -abs)
+     */
+    public void actualizarCantidad(int idDistribucion, int nuevaCantidad) throws Exception {
+
+        String sel = """
+            SELECT id_empaque, id_repartidor, cantidad
+              FROM distribucion
+             WHERE id_distribucion = ?
+             FOR UPDATE
+        """;
+        String upd = "UPDATE distribucion SET cantidad=? WHERE id_distribucion=?";
+
+        try (Connection cn = getConn();
+             PreparedStatement psSel = cn.prepareStatement(sel);
+             PreparedStatement psUpd = cn.prepareStatement(upd)) {
+
+            cn.setAutoCommit(false);
+            try {
+                psSel.setInt(1, idDistribucion);
+
+                int idEmp, idRep, anterior;
+                try (ResultSet rs = psSel.executeQuery()) {
+                    if (!rs.next()) throw new SQLException("Distribución no encontrada");
+                    idEmp    = rs.getInt("id_empaque");
+                    idRep    = rs.getInt("id_repartidor");
+                    anterior = rs.getInt("cantidad");
+                }
+
+                if (existeNotaVenta(idDistribucion))
+                    throw new IllegalStateException("Ya existe nota de venta ligada a esta salida.");
+
+                int delta = nuevaCantidad - anterior;
+                if (delta != 0) {
+                    if (delta > 0) {
+                        callSpMovBodega(cn, idEmp, -delta, "AJUSTE_SALIDA",  idRep, idDistribucion);
+                        upsertInventarioRepartidor(cn, idRep, idEmp, +delta);
+                    } else {
+                        int ret = -delta;
+                        callSpMovBodega(cn, idEmp, +ret,  "AJUSTE_RETORNO", idRep, idDistribucion);
+                        upsertInventarioRepartidor(cn, idRep, idEmp, -ret);
+                    }
+                }
+
+                psUpd.setInt(1, nuevaCantidad);
+                psUpd.setInt(2, idDistribucion);
+                psUpd.executeUpdate();
+
+                cn.commit();
+            } catch (Exception ex) {
+                try { cn.rollback(); } catch (SQLException ignore) {}
+                throw ex;
+            }
+        }
+    }
+
+    /**
+     * Elimina por completo una salida (todas las líneas con la misma fecha/hora exacta).
+     * Devuelve a bodega cada línea y descuenta del inventario del repartidor.
+     */
+    public void eliminarSalida(int idRepartidor, LocalDateTime fechaHora) throws Exception {
+
+        String sel = """
+            SELECT id_distribucion, id_empaque, cantidad
+              FROM distribucion
+             WHERE id_repartidor = ?
+               AND fecha_distribucion = ?
+             FOR UPDATE
+        """;
+        String del = """
+            DELETE FROM distribucion
+             WHERE id_repartidor = ?
+               AND fecha_distribucion = ?
+        """;
+
+        try (Connection cn = getConn();
+             PreparedStatement psSel = cn.prepareStatement(sel);
+             PreparedStatement psDel = cn.prepareStatement(del)) {
+
+            cn.setAutoCommit(false);
+            try {
+                psSel.setInt(1, idRepartidor);
+                psSel.setTimestamp(2, Timestamp.valueOf(fechaHora));
+
+                List<int[]> filas = new ArrayList<>();
+                try (ResultSet rs = psSel.executeQuery()) {
+                    while (rs.next()) {
+                        int idDist = rs.getInt("id_distribucion");
+                        if (existeNotaVenta(idDist))
+                            throw new IllegalStateException("Salida ligada a nota de venta.");
+                        filas.add(new int[]{ rs.getInt("id_distribucion"),
+                                             rs.getInt("id_empaque"),
+                                             rs.getInt("cantidad") });
+                    }
+                }
+
+                for (int[] f : filas) {
+                    int idDist = f[0], idEmp = f[1], cant = f[2];
+                    callSpMovBodega(cn, idEmp, +cant, "ENTRADA_RETORNO", idRepartidor, idDist);
+                    upsertInventarioRepartidor(cn, idRepartidor, idEmp, -cant);
+                }
+
+                psDel.setInt(1, idRepartidor);
+                psDel.setTimestamp(2, Timestamp.valueOf(fechaHora));
+                psDel.executeUpdate();
+
+                cn.commit();
+            } catch (Exception ex) {
+                try { cn.rollback(); } catch (SQLException ignore) {}
+                throw ex;
+            }
+        }
+    }
 
     /* ===================================================== */
     /*  Helpers                                              */
     /* ===================================================== */
+
+    /** Llama al SP que registra un único movimiento en bodega (+/- delta). */
+    private void callSpMovBodega(Connection cn,
+                                 int idEmpaque,
+                                 int delta,
+                                 String motivo,
+                                 Integer idRepartidor,
+                                 Integer idDistribucion) throws SQLException {
+        try (CallableStatement cs = cn.prepareCall("{ call sp_mov_inventario_bodega(?,?,?,?,?) }")) {
+            cs.setInt(1, idEmpaque);
+            cs.setInt(2, delta);
+            cs.setString(3, motivo);
+            if (idRepartidor == null) cs.setNull(4, Types.INTEGER); else cs.setInt(4, idRepartidor);
+            if (idDistribucion == null) cs.setNull(5, Types.INTEGER); else cs.setInt(5, idDistribucion);
+            cs.execute();
+        }
+    }
+
+    /** Inserta/actualiza inventario del repartidor (acumulado distribuido y restante). */
+    private void upsertInventarioRepartidor(Connection cn,
+                                            int idRepartidor,
+                                            int idEmpaque,
+                                            int delta) throws SQLException {
+        String sql = """
+            INSERT INTO inventario_repartidor(id_repartidor, id_empaque, cantidad_distribuida, cantidad_restante)
+            VALUES (?,?,?,?)
+            ON DUPLICATE KEY UPDATE
+                cantidad_distribuida = cantidad_distribuida + VALUES(cantidad_distribuida),
+                cantidad_restante    = GREATEST(0, cantidad_restante + VALUES(cantidad_restante))
+        """;
+        try (PreparedStatement ps = cn.prepareStatement(sql)) {
+            ps.setInt(1, idRepartidor);
+            ps.setInt(2, idEmpaque);
+            ps.setInt(3, Math.max(0, delta)); // solo suma al acumulado cuando delta > 0
+            ps.setInt(4, delta);              // restante puede subir o bajar
+            ps.executeUpdate();
+        }
+    }
 
     private boolean existeNotaVenta(int idDistrib) throws SQLException {
         String q = "SELECT 1 FROM detalle_nota_venta WHERE id_distribucion=? LIMIT 1";
@@ -416,9 +507,7 @@ public void eliminarSalida(int idRepartidor, java.time.LocalDateTime fechaHora) 
     /*  Detalle de una salida (DTO)                          */
     /* ===================================================== */
 
-    /**
-     * Líneas de una salida identificada por repartidor + fecha/hora exacta.
-     */
+    /** Líneas de una salida identificada por repartidor + fecha/hora exacta. */
     public List<DistribucionFilaDTO> buscarPorRepartidorYFechaHora(int idRep,
                                                                    LocalDateTime fechaHora)
             throws SQLException {
