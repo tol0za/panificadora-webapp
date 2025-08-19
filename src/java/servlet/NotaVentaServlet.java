@@ -158,14 +158,31 @@ public class NotaVentaServlet extends HttpServlet {
     /* ==============================================================
      * 1. Repartidores con salida hoy
      * ============================================================ */
-    private void repartidoresHoy(HttpServletRequest req,HttpServletResponse res)
-            throws SQLException,ServletException,IOException{
-        LocalDate hoy = LocalDate.now();
-        List<DistribucionResumen> lista = distribucionDAO.repartidoresConSalida(hoy);
-        req.setAttribute("listaRepartidores", lista);
-        req.setAttribute("hoy", hoy);
-        forwardVista(req,res,"jsp/notas/RepartidoresConSalidaHoy.jsp");
+  private void repartidoresHoy(HttpServletRequest req,HttpServletResponse res)
+        throws SQLException,ServletException,IOException{
+    LocalDate hoy = LocalDate.now();
+    List<DistribucionResumen> lista = distribucionDAO.repartidoresConSalida(hoy);
+
+    // >>> NUEVO: métricas para los badges
+    Map<Integer,Integer> notasPorRep = new HashMap<>();
+    Map<Integer,Double>  totalPorRep = new HashMap<>();
+    for (DistribucionResumen dr : lista) {
+        int idRep = dr.getIdRepartidor();
+        int cnt   = notaDAO.contarPorRepartidorYFecha(idRep, hoy);
+        double tot= notaDAO.getTotalDia(idRep, hoy);
+        notasPorRep.put(idRep, cnt);
+        totalPorRep.put(idRep, tot);
     }
+
+    req.setAttribute("listaRepartidores", lista);
+    req.setAttribute("hoy", hoy);
+
+    // >>> entregar a la vista
+    req.setAttribute("notasPorRep", notasPorRep);
+    req.setAttribute("totalPorRep", totalPorRep);
+
+    forwardVista(req,res,"jsp/notas/RepartidoresConSalidaHoy.jsp");
+}
 
     /* =============================================================
      * 2. Vista del día para un repartidor

@@ -287,4 +287,15 @@ public class NotaVentaDAO {
         n.setTotal(rs.getDouble("total"));
         return n;
     }
+    /** Número de notas de un repartidor en una fecha (hoy). */
+public int contarPorRepartidorYFecha(int idRepartidor, LocalDate fecha) throws SQLException {
+    String sql = "SELECT COUNT(*) FROM notas_venta WHERE id_repartidor=? AND DATE(fecha_nota)=?";
+    try (Connection c = getConn(); PreparedStatement ps = c.prepareStatement(sql)) {
+        ps.setInt(1, idRepartidor);
+        ps.setDate(2, java.sql.Date.valueOf(fecha));
+        try (ResultSet rs = ps.executeQuery()) {
+            return rs.next() ? rs.getInt(1) : 0;
+        }
+    }
+}
 }
