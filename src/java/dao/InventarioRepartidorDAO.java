@@ -129,12 +129,18 @@ public void descontar(int idRep, int idEmp, int piezas) throws SQLException {
     /**
      * Devuelve el stock restante de un empaque para un repartidor.
      */
-public int getRestante(int idRep,int idEmp) throws SQLException {
-    String sql = "SELECT cantidad_restante FROM inventario_repartidor " +
+/** Restante actual para un empaque en el repartidor. */
+public int getRestante(int idRepartidor, int idEmpaque) throws SQLException {
+    String sql = "SELECT COALESCE(cantidad_restante,0) " +
+                 "FROM inventario_repartidor " +
                  "WHERE id_repartidor=? AND id_empaque=?";
-    try(Connection c=getConn(); PreparedStatement ps=c.prepareStatement(sql)){
-        ps.setInt(1,idRep); ps.setInt(2,idEmp);
-        try(ResultSet rs=ps.executeQuery()){ return rs.next()?rs.getInt(1):0; }
+    try (Connection c = Conexion.getConnection();
+         PreparedStatement ps = c.prepareStatement(sql)) {
+        ps.setInt(1, idRepartidor);
+        ps.setInt(2, idEmpaque);
+        try (ResultSet rs = ps.executeQuery()) {
+            return rs.next() ? rs.getInt(1) : 0;
+        }
     }
 }
 /** Deja restante = restante - piezas (normalmente para retornar sobrante) */

@@ -15,6 +15,7 @@ public class NotaVenta {
     private int idTienda;         // FK tiendas.id_tienda
     private LocalDateTime fechaNota; // TIMESTAMP de la venta
     private double total;         // Calculado como suma de subtotales (solo vendidas)
+private String nombreRepartidor;
 private String nombreTienda;
     // --- Relación uno‑a‑muchos con el detalle (opcional en backoffice) ---
     private List<DetalleNotaVenta> detalles;
@@ -22,6 +23,13 @@ private String nombreTienda;
     // ---------------------------------------------------------------------
     // Getters & Setters                                                    
     // ---------------------------------------------------------------------
+public String getNombreRepartidor() { return nombreRepartidor; }
+public void setNombreRepartidor(String s) { this.nombreRepartidor = s; }
+
+// Alias para compatibilidad con JSP antiguas:
+public java.sql.Timestamp getFechaHora() {
+    return getFechaNota() == null ? null : java.sql.Timestamp.valueOf(getFechaNota());
+}
     public int getIdNotaVenta() {
         return idNotaVenta;
     }
@@ -79,6 +87,9 @@ private String nombreTienda;
     }
     public String getNombreTienda() { return nombreTienda; }
 public void setNombreTienda(String nombreTienda) { this.nombreTienda = nombreTienda; }
+public String getFechaNotaStr() {
+    return fechaNota != null ? fechaNota.toString().replace('T',' ') : "";
+}
 
 public int getIdNota() {              // ← alias para JSP antiguos
     return idNotaVenta;

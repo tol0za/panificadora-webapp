@@ -204,20 +204,29 @@
             <th>Fecha</th><th>Folio</th><th>Repartidor</th><th>Tienda</th><th class="text-end">Total</th>
           </tr>
         </thead>
-        <tbody>
-          <c:forEach items="${listaNotas}" var="n">
-            <tr>
-              <td>${n.fechaHora}</td>
-              <td>${n.folio}</td>
-              <td>${n.repartidor}</td>
-              <td>${n.tienda}</td>
-              <td class="text-end"><fmt:formatNumber value="${n.total}" type="currency"/></td>
-            </tr>
-          </c:forEach>
-          <c:if test="${empty listaNotas}">
-            <tr><td colspan="5" class="text-center text-muted">Sin notas en el rango.</td></tr>
-          </c:if>
-        </tbody>
+    <tbody>
+  <c:forEach items="${listaNotas}" var="n">
+    <tr>
+      <!-- fechaNota existe (columna real: fecha_nota) -->
+      <td>${n.fechaNota}</td>
+
+      <td>${n.folio}</td>
+
+      <!-- nombreRepartidor / nombreTienda (fallback a id si vinieran nulos) -->
+      <td>${empty n.nombreRepartidor ? n.idRepartidor : n.nombreRepartidor}</td>
+      <td>${empty n.nombreTienda     ? n.idTienda     : n.nombreTienda}</td>
+
+      <!-- total viene de DB; si fuera 0, más abajo lo recalculamos en el servlet -->
+      <td class="text-end">
+        <fmt:formatNumber value="${n.total}" type="currency"/>
+      </td>
+    </tr>
+  </c:forEach>
+
+  <c:if test="${empty listaNotas}">
+    <tr><td colspan="5" class="text-center text-muted">Sin notas en el rango.</td></tr>
+  </c:if>
+</tbody>
       </table>
     </div>
   </div>
