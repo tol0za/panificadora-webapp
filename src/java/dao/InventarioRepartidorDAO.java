@@ -197,16 +197,14 @@ public void consumirRestante(int idRep,
                              int piezas) throws SQLException {
     String sql = """
         UPDATE inventario_repartidor
-           SET cantidad_vendida  = IFNULL(cantidad_vendida,0) + ?,
-               cantidad_restante = GREATEST(cantidad_restante - ?, 0)
+           SET cantidad_restante = GREATEST(cantidad_restante - ?, 0)
          WHERE id_repartidor = ? AND id_empaque = ?
     """;
     try (Connection c = getConn();
          PreparedStatement ps = c.prepareStatement(sql)) {
         ps.setInt(1, piezas);
-        ps.setInt(2, piezas);
-        ps.setInt(3, idRep);
-        ps.setInt(4, idEmp);
+        ps.setInt(2, idRep);
+        ps.setInt(3, idEmp);
         ps.executeUpdate();
     }
 }

@@ -1,209 +1,302 @@
-/**
- * static/js/notas.js – Módulo Notas de venta
- * ▸ Mantiene TODAS las funciones originales.
- * ▸ Añade validación de stock fila-a-fila y
- *   el botón “Imprimir día” (simple <a>, no requiere JS extra).
- */
-(() => {
-  /* ---------- contexto y datos ---------- */
-  const ctx          = document.body.dataset.ctx  || '';
-  const rutaCerrada  = document.body.dataset.rutaCerrada === 'true';
-  const inv          = JSON.parse(document.getElementById('inventarioJson')?.textContent || '{}');
+// /static/js/notas.js  —  Nueva nota (modal)
+(function () {
+  "use strict";
 
-  /* ---------- refs ---------- */
-  const modalNotaEl  = document.getElementById('modalNota');
-  const modalNota    = modalNotaEl ? new bootstrap.Modal(modalNotaEl) : null;
-  const tblBody      = document.querySelector('#tblDetalle tbody');
-  const totalTd      = document.getElementById('tdTotal');
-  const btnAdd       = document.getElementById('btnAddLinea');
-  const btnSave      = document.getElementById('btnSave') ||
-                       document.querySelector('#formNota button[type="submit"]');
-  const selTienda    = document.getElementById('selTienda');
+  // ========= Formato / helpers =========
+  const fmtMoney = (n) =>
+    new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" })
+      .format(Number(n) || 0);
 
-  const inpFolio     = document.getElementById('inpFolio');
-  const helpBad      = document.getElementById('folioHelpBad');
-  const helpGood     = document.getElementById('folioHelpGood');
-
-  const modalDetEl   = document.getElementById('modalDet');
-  const modalDet     = modalDetEl ? new bootstrap.Modal(modalDetEl) : null;
-
-  /* ---------- NUEVA NOTA ---------- */
-  document.getElementById('btnNueva')?.addEventListener('click', () => modalNota?.show());
-
-  /* ---------- validación folio dup (AJAX) ---------- */
-  let debounce;
-  function setState(st){
-    if (st === 'dup') {
-      helpBad .classList.remove('d-none'); helpGood.classList.add   ('d-none');
-      inpFolio.classList.add('is-invalid'); inpFolio.classList.remove('is-valid');
-      disableCtrls(true);
-    } else if (st === 'ok') {
-      helpBad .classList.add('d-none'); helpGood.classList.remove('d-none');
-      inpFolio.classList.remove('is-invalid'); inpFolio.classList.add('is-valid');
-      disableCtrls(false);
-    } else { // reset
-      helpBad.classList.add('d-none'); helpGood.classList.add('d-none');
-      inpFolio.classList.remove('is-invalid','is-valid');
-      disableCtrls(true);
-    }
-  }
-  function disableCtrls(d){ selTienda.disabled=d; btnAdd.disabled=d; btnSave.disabled=d; }
-
-  inpFolio?.addEventListener('input', ()=>{
-    clearTimeout(debounce);
-    const v = inpFolio.value.trim();
-    if (v === '') { setState('empty'); return; }
-    debounce = setTimeout(async()=>{
-      let dup = true;
-      try{
-        const r = await fetch(`${ctx}/NotaVentaServlet?accion=folioCheck&folio=`+v);
-        dup = (await r.text()) === '1';
-      }catch{}
-      setState(dup ? 'dup':'ok');
-    },300);
-  });
-
-  /* ---------- reset modal ---------- */
-  modalNotaEl?.addEventListener('hidden.bs.modal', ()=>{
-    document.getElementById('formNota').reset();
-    tblBody.innerHTML=''; totalTd.textContent='0.00';
-    setState('empty');
-  });
-
-  /* ---------- agregar fila detalle ---------- */
-  btnAdd?.addEventListener('click', ()=>{
-    if (!Object.keys(inv).length){ alert('Sin empaques disponibles'); return; }
-    const tr = tblBody.insertRow();
-    tr.innerHTML = makeRowHTML(inv);
-    const sel = tr.querySelector('.selEmp');
-    syncDataset(tr, sel.value);
-    attachQtyListeners(tr);
-    sel.addEventListener('change',  e=>{
-      syncDataset(tr,e.target.value);
-      validarFila({target:tr.querySelector('.inpVendidas')});
-    });
-    tr.querySelector('.btn-del').onclick = ()=>{ tr.remove(); calcTotal(); validarFormulario(); };
-    calcSub(tr); calcTotal(); validarFormulario();
-  });
-
-  function makeRowHTML(map){
-    let opts='';
-    for(const [id,o] of Object.entries(map))
-      opts += `<option value="${id}">${o.nombre}</option>`;
-    return `
-      <td><select class="form-select selEmp">${opts}</select></td>
-      <td><input type="number" class="form-control inpVendidas inpQty" min="0" value="0"></td>
-      <td><input type="number" class="form-control inpMerma   inpQty" min="0" value="0"></td>
-      <td class="sub">0.00</td>
-      <td><button type="button" class="btn btn-sm btn-outline-danger p-0 btn-del"
-                 title="Eliminar"><i class="bi bi-trash"></i></button></td>`;
-  }
-  function syncDataset(tr,id){
-    tr.dataset.idEmpaque = id;
-    tr.dataset.dist      = inv[id].idDistribucion || 0;
-    tr.dataset.price     = inv[id].precio;
-  }
-
-  /* ---------- subtotales / total ---------- */
-  function calcSub(tr){
-    const vend  = +tr.querySelector('.inpVendidas').value || 0;
-    tr.querySelector('.sub').textContent =
-        (vend * (+tr.dataset.price || 0)).toFixed(2);
-  }
-  function calcTotal(){
-    let t = 0;
-    tblBody.querySelectorAll('.sub').forEach(td => t += +td.textContent);
-    totalTd.textContent = t.toFixed(2);
-  }
-
-  /* ---------- qty listeners ---------- */
-  function attachQtyListeners(row){
-    row.querySelectorAll('.inpQty').forEach(inp=>{
-      inp.addEventListener('input', validarFila);
-    });
-  }
-
-  /* ---------- validación stock fila ---------- */
-  function validarFila(e){
-    const tr    = e.target.closest('tr');
-    const idEmp = +tr.dataset.idEmpaque;
-    const vend  = +tr.querySelector('.inpVendidas').value || 0;
-    const merm  = +tr.querySelector('.inpMerma').value   || 0;
-    const rest  = inv[idEmp].restante;
-
-    let help = tr.querySelector('.help-stock');
-    if (!help){
-      help = document.createElement('div');
-      help.className = 'help-stock text-danger small';
-      tr.cells[3].appendChild(help);
-    }
-    if (vend + merm > rest){
-      help.textContent = `Máximo ${rest} piezas disponibles`;
-      tr.classList.add('table-danger'); tr.dataset.ok='0';
-    }else{
-      help.textContent=''; tr.classList.remove('table-danger'); tr.dataset.ok='1';
-    }
-    calcSub(tr); calcTotal(); validarFormulario();
-  }
-  function validarFormulario(){
-    const ok = [...tblBody.rows].every(tr=>tr.dataset.ok!=='0');
-    btnSave.disabled = !ok || tblBody.rows.length===0;
-  }
-
-  /* ---------- serializar detalle ---------- */
-  document.getElementById('formNota')?.addEventListener('submit', e=>{
-    if(btnSave.disabled){ e.preventDefault(); return; }
-    const lines=[];
-    tblBody.querySelectorAll('tr').forEach(tr=>{
-      const v = +tr.querySelector('.inpVendidas').value,
-            m = +tr.querySelector('.inpMerma').value;
-      if(v===0 && m===0) return;
-      lines.push({
-        idEmpaque:+tr.dataset.idEmpaque||0,
-        idDistribucion:+tr.dataset.dist||0,
-        vendidas:v, merma:m, precio:+tr.dataset.price
-      });
-    });
-    if(!lines.length){ e.preventDefault(); alert('Debe agregar al menos un paquete'); }
-    else document.getElementById('lineas').value = JSON.stringify(lines);
-  });
-
-  /* ---------- cerrar ruta ---------- */
-  window.cerrarRuta = id=>{
-    if(confirm('¿Cerrar ruta y devolver sobrante?')){
-      location.href = `${ctx}/NotaVentaServlet?inFrame=1&accion=cerrarRuta&id_repartidor=${id}`;
-    }
+  const clampInt = (v) => {
+    v = (v ?? "").toString().replace(/[^\d-]/g, "");
+    const n = parseInt(v || "0", 10);
+    return Number.isFinite(n) ? Math.max(0, n) : 0;
   };
 
-  /* ---------- DETALLE NOTA ---------- */
-  document.querySelectorAll('.btn-det').forEach(btn=>{
-    btn.addEventListener('click', async e=>{
+  // ========= Inventario inyectado (fallback si el <option> no trae data-*) =========
+  let INV = {};
+  try {
+    const raw = document.getElementById("inventarioJson")?.textContent
+             || document.getElementById("invJson")?.textContent
+             || "{}";
+    INV = JSON.parse(raw);
+  } catch { INV = {}; }
+
+  // ========= Elementos UI =========
+  const modalEl     = document.getElementById("modalNota");
+  const modal       = (modalEl && typeof bootstrap !== "undefined") ? new bootstrap.Modal(modalEl) : null;
+  const tbody       = document.querySelector("#tblDetalle tbody, #tblDet tbody");
+  const tdTotal     = document.getElementById("tdTotal")
+                   || document.getElementById("mdTotal")
+                   || document.getElementById("totalEditar")
+                   || (tbody && tbody.closest("table")?.parentElement?.querySelector("#tdTotal, #mdTotal, #totalEditar"));
+  const btnNueva    = document.getElementById("btnNueva");
+  const btnAddLinea = document.getElementById("btnAddLinea");
+  const btnSave     = document.getElementById("btnSave") || document.querySelector('.btn-primary[type="submit"]');
+  const selTienda   = document.getElementById("selTienda");
+  const inpFolio    = document.getElementById("inpFolio");
+  const lineasField = document.getElementById("lineas");
+
+  const helpBad  = document.getElementById("folioHelpBad");
+  const helpGood = document.getElementById("folioHelpGood");
+  let folioOk = true;
+
+  // ========= Construcción de filas =========
+  function opcionesEmpaqueHTML() {
+    const ids = Object.keys(INV);
+    if (!ids.length) return '<option value="" disabled>Sin inventario</option>';
+    return ids.map(id => {
+      const e = INV[id] || {};
+      return `
+        <option value="${id}"
+                data-precio="${e.precio ?? 0}"
+                data-restante="${e.restante ?? 0}"
+                data-iddist="${e.idDistribucion ?? 0}">
+          ${e.nombre ?? ('ID ' + id)} — disp. ${e.restante ?? 0}
+        </option>`;
+    }).join("");
+  }
+
+  function rowHTML() {
+    return `
+      <tr>
+        <td><select class="form-select form-select-sm selEmp">${opcionesEmpaqueHTML()}</select></td>
+        <td><input class="form-control form-control-sm inpVendidas" type="number" min="0" value="0"></td>
+        <td><input class="form-control form-control-sm inpMerma"    type="number" min="0" value="0"></td>
+        <td class="text-end cobradasCell">0</td>
+        <td class="text-end"><span class="sub" data-val="0">0.00</span></td>
+        <td class="text-center">
+          <button type="button" class="btn btn-sm btn-outline-danger btnDel"><i class="bi bi-trash"></i></button>
+        </td>
+      </tr>`;
+  }
+
+  // ========= Info precio/stock con fallback a INV =========
+  function getInfo(tr) {
+    const sel = tr.querySelector(".selEmp");
+    const opt = sel?.selectedOptions?.[0];
+    const id  = parseInt(opt?.value || tr.dataset.id || "0", 10) || 0;
+
+    let precio = Number(opt?.dataset?.precio);
+    let rest   = parseInt(opt?.dataset?.restante || "", 10);
+
+    if (!Number.isFinite(precio) || precio <= 0) precio = Number(INV[id]?.precio)   || 0;
+    if (!Number.isFinite(rest)   || rest   <  0) rest   = parseInt(INV[id]?.restante || "0", 10) || 0;
+
+    return { precio, rest, id };
+  }
+
+  // ========= Recalc fila: COBRADAS = vendidas - merma; Subtotal = cobradas * precio =========
+  function recalcRow(tr) {
+    const vInp = tr.querySelector(".inpVendidas");
+    const mInp = tr.querySelector(".inpMerma");
+    const sub  = tr.querySelector(".sub");
+    const cobC = tr.querySelector(".cobradasCell");
+    if (!vInp || !mInp || !sub) return true;
+
+    const vend = clampInt(vInp.value);
+    const mer  = clampInt(mInp.value);
+    vInp.value = vend; mInp.value = mer;
+
+    const { precio, rest } = getInfo(tr);
+
+    const excedeStock = (vend + mer) > rest; // lo que realmente se mueve del reparto
+    const mermaMayor  = mer > vend;
+    const invalid     = excedeStock || mermaMayor || vend < 0 || mer < 0;
+
+    tr.classList.toggle("table-danger", invalid);
+    vInp.classList.toggle("is-invalid", invalid);
+    mInp.classList.toggle("is-invalid", invalid);
+
+    const cobradas = Math.max(0, vend - mer);
+    if (cobC) cobC.textContent = String(cobradas);
+
+    const subtotal = cobradas * (Number.isFinite(precio) ? precio : 0);
+    sub.dataset.val = String(subtotal);
+    sub.textContent = fmtMoney(subtotal);
+
+    return !invalid;
+  }
+
+  function recalcTotal() {
+    if (!tbody || !tdTotal || !btnSave) return;
+    let tot = 0, ok = true, filas = 0;
+    tbody.querySelectorAll("tr").forEach(tr => {
+      filas++;
+      if (!recalcRow(tr)) ok = false;
+      const v = Number(tr.querySelector(".sub")?.dataset.val || 0);
+      tot += Number.isFinite(v) ? v : 0;
+    });
+    tdTotal.textContent = fmtMoney(tot);
+    const tiendaOk = !!selTienda?.value;
+    btnSave.disabled = !(filas > 0 && ok && tot > 0 && tiendaOk && folioOk);
+  }
+
+  // ========= Agregar fila (evita condición de carrera) =========
+  function addRow() {
+    if (!tbody) return;
+    tbody.insertAdjacentHTML("beforeend", rowHTML());
+
+    // Recalcular inmediatamente la nueva fila y toda la tabla
+    const last = tbody.lastElementChild;
+    if (last) {
+      // valores seguros
+      const vi = last.querySelector(".inpVendidas"); if (vi && !vi.value) vi.value = "0";
+      const mi = last.querySelector(".inpMerma");    if (mi && !mi.value) mi.value = "0";
+    }
+    recalcTotal();                 // 1) inmediato
+    setTimeout(recalcTotal, 0);    // 2) siguiente tick (por si otro script recalculó mal)
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(recalcTotal); // 3) tras el reflow de la nueva fila
+    }
+  }
+
+  // ========= Delegación: garantiza escuchar SIEMPRE los cambios =========
+  if (tbody) {
+    tbody.addEventListener("input",  (ev) => {
+      if (ev.target.matches('input[type="number"], select')) {
+        const tr = ev.target.closest("tr");
+        if (tr) { recalcRow(tr); recalcTotal(); }
+      }
+    });
+    tbody.addEventListener("change", (ev) => {
+      if (ev.target.matches('select')) {
+        const tr = ev.target.closest("tr");
+        if (tr) { recalcRow(tr); recalcTotal(); }
+      }
+    });
+    tbody.addEventListener("click", (ev) => {
+      if (ev.target.closest(".btnDel")) { ev.preventDefault(); ev.target.closest("tr")?.remove(); recalcTotal(); }
+    });
+
+    // Observa inserciones (si otro script agrega filas)
+    const mo = new MutationObserver((muts) => {
+      let added = false;
+      muts.forEach(m => m.addedNodes?.forEach(n => {
+        if (n.nodeType === 1 && n.matches("tr")) {
+          added = true;
+          const vi = n.querySelector(".inpVendidas"); if (vi && !vi.value) vi.value = "0";
+          const mi = n.querySelector(".inpMerma");    if (mi && !mi.value) mi.value = "0";
+          recalcRow(n);
+        }
+      }));
+      if (added) { recalcTotal(); setTimeout(recalcTotal,0); }
+    });
+    mo.observe(tbody, { childList: true });
+  }
+
+  // ========= Nueva nota =========
+  btnNueva?.addEventListener("click", () => {
+    if (selTienda) selTienda.disabled = false;
+    if (btnAddLinea) btnAddLinea.disabled = false;
+
+    if (tbody) {
+      tbody.innerHTML = "";
+      addRow();
+    }
+    recalcTotal();
+    modal?.show();
+    if (inpFolio?.value) debounceFolio();
+  });
+
+  btnAddLinea?.addEventListener("click", addRow);
+  selTienda?.addEventListener("change", recalcTotal);
+
+  // ========= Guardar =========
+  btnSave?.addEventListener("click", (ev) => {
+    ev.preventDefault();
+    if (!tbody || !lineasField || btnSave.disabled) return;
+
+    const lineas = [];
+    tbody.querySelectorAll("tr").forEach(tr => {
+      const sel   = tr.querySelector(".selEmp");
+      const opt   = sel?.selectedOptions?.[0];
+      const idEmp = parseInt(sel?.value || "0", 10);
+      if (!idEmp) return;
+
+      const vendidas = clampInt(tr.querySelector(".inpVendidas")?.value);
+      const merma    = clampInt(tr.querySelector(".inpMerma")?.value);
+
+      let precio = Number(opt?.dataset?.precio);
+      let idDist = parseInt(opt?.dataset?.iddist || opt?.dataset?.idDist || "0", 10) || 0;
+      if (!Number.isFinite(precio) || precio <= 0) precio = Number(INV[idEmp]?.precio) || 0;
+      if (!idDist) idDist = parseInt(INV[idEmp]?.idDistribucion || "0", 10) || 0;
+
+      lineas.push({ idEmpaque:idEmp, idDistribucion:idDist, vendidas, merma, precio });
+    });
+
+    if (!lineas.length) return;
+    lineasField.value = JSON.stringify(lineas);
+    document.getElementById("formNota")?.submit();
+  });
+
+  // ========= Folio duplicado =========
+  function setFolioState(ok) {
+    folioOk = !!ok;
+    helpBad?.classList.toggle("d-none", ok);
+    helpGood?.classList.toggle("d-none", !ok);
+    recalcTotal();
+  }
+  let tFolio;
+  function debounceFolio() {
+    clearTimeout(tFolio);
+    const folio = (inpFolio?.value || "").trim();
+    if (!folio) { setFolioState(true); return; }
+    tFolio = setTimeout(() => {
+      fetch(`${document.body.dataset.ctx || ""}/NotaVentaServlet?accion=folioCheck&folio=${encodeURIComponent(folio)}`)
+        .then(r => r.text())
+        .then(t => setFolioState((t || "").trim() !== "1"))
+        .catch(() => setFolioState(true));
+    }, 250);
+  }
+  inpFolio?.addEventListener("input", debounceFolio);
+
+  // ========= Modal Detalle (ver) — “Cobradas = Vendidas − Merma” =========
+  document.querySelectorAll(".btn-det").forEach(btn => {
+    btn.addEventListener("click", (e) => {
       e.preventDefault();
-      const idNota=btn.dataset.idnota, folio=btn.dataset.folio, tienda=btn.dataset.tienda;
+      const id = btn.dataset.idnota;
+      fetch(`${document.body.dataset.ctx || ""}/NotaVentaServlet?accion=detalleJson&id=${id}`)
+        .then(r => r.json())
+        .then(arr => {
+          const md = document.getElementById("modalDet");
+          if (!md) return;
 
-      document.getElementById('mdFolio').textContent  = `#${folio}`;
-      document.getElementById('mdTienda').textContent = tienda;
-      document.getElementById('mdEditar').href =
-        `${ctx}/NotaVentaServlet?inFrame=1&accion=editarNota&id=`+idNota;
+          md.querySelector("#mdFolio").textContent  = btn.dataset.folio || "";
+          md.querySelector("#mdTienda").textContent = btn.dataset.tienda || "";
 
-      const cuerpo = document.getElementById('mdBody');
-      cuerpo.innerHTML=''; document.getElementById('mdTotal').textContent='0.00';
+          const body = md.querySelector("#mdBody");
+          const tdT  = md.querySelector("#mdTotal");
+          body.innerHTML = "";
+          let total = 0;
 
-      try{
-        const r = await fetch(`${ctx}/NotaVentaServlet?accion=detalleJson&id=`+idNota);
-        const dat = await r.json();
-        let tot=0;
-        dat.forEach(l=>{
-          cuerpo.insertAdjacentHTML('beforeend',`
-            <tr><td>${l.nombreEmpaque}</td>
-                <td>${l.cantidadVendida}</td>
-                <td>${l.merma}</td>
-                <td>${(+l.totalLinea).toFixed(2)}</td></tr>`);
-          tot += l.totalLinea;
+          (arr || []).forEach(d => {
+            const vend   = Number(d.cantidadVendida || 0);
+            const mer    = Number(d.merma || 0);
+            const cobr   = Math.max(0, vend - mer);
+            const precio = Number(d.precioUnitario || 0);
+            const sub = cobr * precio;
+            total += sub;
+
+            body.insertAdjacentHTML("beforeend", `
+              <tr>
+                <td>${d.nombreEmpaque || d.idEmpaque}</td>
+                <td>${cobr}</td>
+                <td>${mer}</td>
+                <td class="text-end">${fmtMoney(sub)}</td>
+              </tr>`);
+          });
+
+          tdT.textContent = fmtMoney(total);
+          const btnEdit = md.querySelector("#mdEditar");
+          if (btnEdit && id) btnEdit.href =
+            `${document.body.dataset.ctx || ""}/NotaVentaServlet?inFrame=1&accion=editarNota&id=${id}`;
+
+          if (typeof bootstrap !== "undefined") new bootstrap.Modal(md).show();
         });
-        document.getElementById('mdTotal').textContent = tot.toFixed(2);
-        modalDet?.show();
-      }catch{ alert('No se pudo cargar el detalle'); }
     });
   });
+
+  // Recalcular al mostrar la modal
+  modalEl?.addEventListener("shown.bs.modal", recalcTotal);
 })();

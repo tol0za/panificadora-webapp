@@ -10,7 +10,6 @@
 </head>
 
 <c:set var="ctx" value="${pageContext.request.contextPath}"/>
-
 <c:set var="totalRestante" value="0" />
 <c:forEach items="${inventario}" var="i">
   <c:set var="totalRestante" value="${totalRestante + i.restante}" />
@@ -199,16 +198,20 @@
 
 </div>
 
+<!-- ========= Modales ========= -->
+
 <div id="modalNota" class="modal fade" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg"><div class="modal-content">
     <form id="formNota" action="${ctx}/NotaVentaServlet" method="post">
       <input type="hidden" name="accion"        value="guardarNota">
       <input type="hidden" name="id_repartidor" value="${repartidor.idRepartidor}">
       <input type="hidden" id="lineas" name="lineas">
+
       <div class="modal-header">
         <h5 class="modal-title">Nueva nota</h5>
         <button class="btn-close" data-bs-dismiss="modal"></button>
       </div>
+
       <div class="modal-body">
         <div class="row g-2 mb-3">
           <div class="col-md-4">
@@ -231,19 +234,22 @@
         <div class="table-responsive mb-2">
           <table id="tblDetalle" class="table table-bordered">
             <thead class="table-light">
-              <tr><th>Empaque</th><th>Vendidas</th><th>Merma</th><th>Subtotal</th><th></th></tr>
+              <!-- Agregamos la columna COBRADAS -->
+              <tr><th>Empaque</th><th>Vendidas</th><th>Merma</th><th>Cobradas</th><th>Subtotal</th><th></th></tr>
             </thead>
             <tbody></tbody>
             <tfoot class="table-secondary">
-              <tr><td colspan="3" class="text-end">Total</td><td id="tdTotal">0.00</td><td></td></tr>
+              <tr><td colspan="4" class="text-end">Total</td><td id="tdTotal">0.00</td><td></td></tr>
             </tfoot>
           </table>
         </div>
+
         <button id="btnAddLinea" type="button"
                 class="btn btn-outline-secondary w-100" disabled>
           + Agregar paquete
         </button>
       </div>
+
       <div class="modal-footer">
         <button id="btnSave" class="btn btn-primary" disabled>Guardar nota</button>
       </div>
@@ -262,7 +268,7 @@
       <div class="table-responsive">
         <table class="table table-bordered">
           <thead class="table-light">
-            <tr><th>Empaque</th><th>Vendidas</th><th>Merma</th><th>Subtotal</th></tr>
+            <tr><th>Empaque</th><th>Cobradas</th><th>Merma</th><th>Subtotal</th></tr>
           </thead>
           <tbody id="mdBody"></tbody>
           <tfoot class="table-secondary">
@@ -317,19 +323,121 @@
 </div>
 
 <script id="inventarioJson" type="application/json">${inventarioJson}</script>
-
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script src="${ctx}/static/js/notas.js"></script>
+<script src="${ctx}/static/js/notas.js?v=fix-merma-1"></script>
 
+<!-- === Overlay: COBRADAS = vendidas - merma; Subtotal = cobradas * precio  === -->
+<script>
+(function(){
+  const fmtMX = new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN'});
+  const fmt = n => fmtMX.format(Number(n)||0);
+  const clamp = v => { v=(''+(v??'')).replace(/[^\d-]/g,''); const n=parseInt(v,10); return Number.isFinite(n)?Math.max(0,n):0; };
+  let INV={}; try{ INV=JSON.parse(document.getElementById('inventarioJson')?.textContent||'{}'); }catch(_){ INV={}; }
+
+  const tbody = document.querySelector('#tblDetalle tbody');
+  const tdTot = document.getElementById('tdTotal');
+  const btnSave = document.getElementById('btnSave');
+  const selTienda = document.getElementById('selTienda');
+
+  function ensureCobradasCell(tr){
+    if (!tr.querySelector('.cobradasCell')) {
+      const subCell = tr.querySelector('.sub, .subCell') || tr.querySelector('td:nth-last-child(2)');
+      const td = document.createElement('td');
+      td.className = 'text-end cobradasCell';
+      td.textContent = '0';
+      if (subCell && subCell.parentNode) {
+        subCell.parentNode.insertBefore(td, subCell);
+      } else {
+        tr.insertBefore(td, tr.lastElementChild); // fallback
+      }
+    }
+  }
+
+  function getOpt(tr){ const sel=tr.querySelector('select'); return sel? sel.selectedOptions[0] : null; }
+  function getInfo(tr){
+    const opt = getOpt(tr);
+    const id  = parseInt(opt?.value || tr.getAttribute('data-id') || tr.dataset.id || '0',10) || 0;
+    let precio   = Number(opt?.dataset?.precio);
+    let restante = parseInt(opt?.dataset?.restante || '',10);
+    if (!Number.isFinite(precio)   || precio<=0) precio   = Number(INV[id]?.precio)||0;
+    if (!Number.isFinite(restante) || restante<0) restante = parseInt(INV[id]?.restante||'0',10)||0;
+    return { precio, restante };
+  }
+
+  function recalcRow(tr){
+    ensureCobradasCell(tr);
+
+    const vendInp = tr.querySelector('.inpVendidas') || tr.querySelector('input[name="vendidas"],input[name="vendidas[]"]');
+    const merInp  = tr.querySelector('.in-merma')    || tr.querySelector('input[name="merma"],input[name="merma[]"]');
+    const cobrTd  = tr.querySelector('.cobradasCell');
+    const subEl   = tr.querySelector('.sub') || tr.querySelector('.subCell') || tr.querySelector('td:nth-last-child(2)');
+
+    const vend = clamp(vendInp?.value);
+    const mer  = clamp(merInp?.value);
+    if (vendInp) vendInp.value = vend;
+    if (merInp)  merInp.value  = mer;
+
+    const { precio, restante } = getInfo(tr);
+
+    const excedeStock = vend > restante;
+    const mermaMayor  = mer  > vend;
+    const invalid = (vend < 0) || (mer < 0) || excedeStock || mermaMayor;
+    tr.classList.toggle('table-danger', invalid);
+    vendInp?.classList.toggle('is-invalid', invalid);
+    merInp?.classList.toggle('is-invalid', invalid);
+
+    const cobradas = Math.max(0, vend - mer);
+    if (cobrTd) cobrTd.textContent = cobradas;
+
+    const sub = cobradas * (Number.isFinite(precio) ? precio : 0);
+    if (subEl) { subEl.dataset.val = String(sub); subEl.textContent = fmt(sub); }
+    return !invalid;
+  }
+
+  function recalcTotal(){
+    let total=0, ok=true, rows=0;
+    (tbody?.querySelectorAll('tr')||[]).forEach(tr=>{
+      rows++;
+      if(!recalcRow(tr)) ok=false;
+      const v = Number(tr.querySelector('.sub')?.dataset.val || tr.querySelector('.subCell')?.dataset.val || 0);
+      total += Number.isFinite(v) ? v : 0;
+    });
+    if (tdTot) tdTot.textContent = fmt(total);
+    const tiendaOk = !!(selTienda?.value);
+    btnSave?.toggleAttribute('disabled', !(rows>0 && ok && total>0 && tiendaOk));
+  }
+
+  function bindRow(tr){
+    ensureCobradasCell(tr);
+    tr.addEventListener('input',  ev => { if (ev.target.matches('input[type="number"], select')) { recalcRow(tr); recalcTotal(); } });
+    tr.addEventListener('change', ev => { if (ev.target.matches('select')) { recalcRow(tr); recalcTotal(); } });
+    recalcRow(tr);
+  }
+
+  // enlaza existentes
+  (tbody?.querySelectorAll('tr')||[]).forEach(bindRow);
+
+  // observa nuevas filas que agregue notas.js
+  const mo = new MutationObserver(muts=>{
+    muts.forEach(m=> m.addedNodes.forEach(n=>{
+      if(n.nodeType===1 && n.tagName==='TR'){ bindRow(n); recalcTotal(); }
+    }));
+  });
+  if (tbody) mo.observe(tbody, {childList:true});
+
+  // al abrir el modal, recalcula
+  document.getElementById('modalNota')?.addEventListener('shown.bs.modal', recalcTotal);
+})();
+</script>
+
+<!-- Script de flash / confirmación (sin cambios) -->
 <script>
 (function () {
-  // Mostrar modal de notificación si hay flash en sesión
   const fb = document.getElementById('flashBridge');
   if (fb) {
     const kind  = fb.dataset.kind || 'success';
     const title = fb.dataset.title || 'Operación realizada';
     const msg   = fb.querySelector('#flashMessage')?.textContent || '';
-
     const map = {
       success: { icon: 'bi-check-circle', header: 'bg-success-subtle border-success', title: 'text-success' },
       error:   { icon: 'bi-x-circle',     header: 'bg-danger-subtle border-danger',   title: 'text-danger'  },
@@ -337,23 +445,14 @@
       info:    { icon: 'bi-info-circle',  header: 'bg-info-subtle border-info',       title: 'text-info'    }
     };
     const conf = map[kind] || map.success;
-
-    const elIcon   = document.getElementById('flashIcon');
-    const elTitle  = document.getElementById('flashTitle');
-    const elMsg    = document.getElementById('flashMsg');
-    const elHeader = document.getElementById('flashHeader');
-
-    elIcon.className = 'bi ' + conf.icon;
-    elTitle.className = conf.title;
-    elHeader.className = 'modal-header ' + conf.header;
-
-    elTitle.textContent = title;
-    elMsg.textContent   = msg;
-
+    document.getElementById('flashIcon').className  = 'bi ' + conf.icon;
+    document.getElementById('flashTitle').className = conf.title;
+    document.getElementById('flashHeader').className= 'modal-header ' + conf.header;
+    document.getElementById('flashTitle').textContent = title;
+    document.getElementById('flashMsg').textContent   = msg;
     new bootstrap.Modal(document.getElementById('mdlFlash')).show();
   }
 
-  // Confirmación modal reutilizable
   const mdlEl = document.getElementById('mdlConfirm');
   const mdl   = new bootstrap.Modal(mdlEl);
   let onOk = null;
@@ -371,7 +470,6 @@
     mdl.show();
   }
 
-  // Botones que confirman envío de formulario
   document.querySelectorAll('.js-confirm-submit').forEach(function (btn) {
     btn.addEventListener('click', function (ev) {
       ev.preventDefault();
@@ -384,7 +482,6 @@
     });
   });
 
-  // Enlaces que confirman navegación (eliminar nota, etc.)
   document.querySelectorAll('.js-confirm-goto').forEach(function (a) {
     a.addEventListener('click', function (ev) {
       ev.preventDefault();

@@ -114,15 +114,16 @@ public List<DetalleNotaVenta> listarPorNota(int idNota) throws SQLException {
     }
     /* Devuelve el total calculado de la nota = Σ (vendidas * precio_unitario) */
 public double obtenerTotalPorNota(int idNota) throws SQLException {
-    String sql = """
-        SELECT COALESCE(SUM(cantidad_vendida * precio_unitario), 0) AS total
-        FROM detalle_nota_venta
-        WHERE id_nota = ?""";
+    final String sql = """
+        SELECT COALESCE(SUM( (cantidad_vendida - COALESCE(merma,0)) * precio_unitario ), 0)
+          FROM detalle_nota_venta
+         WHERE id_nota = ?      -- <== usa el nombre real de tu FK
+    """;
     try (Connection c = Conexion.getConnection();
          PreparedStatement ps = c.prepareStatement(sql)) {
         ps.setInt(1, idNota);
         try (ResultSet rs = ps.executeQuery()) {
-            return rs.next() ? rs.getDouble("total") : 0;
+            return rs.next() ? rs.getDouble(1) : 0.0;
         }
     }
 }

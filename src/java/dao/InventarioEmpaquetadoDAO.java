@@ -74,6 +74,20 @@ public class InventarioEmpaquetadoDAO {
         }
         return lista;
     }
+    // === NUEVO: devuelve piezas al stock como ajuste de ENTRADA ===
+public void registrarMovimientoAjusteEntrada(int idEmpaque, int cantidad, String motivo, String descripcion) throws SQLException {
+    if (cantidad <= 0) return;
+    String sql = "INSERT INTO inventario_empaquetado " +
+                 "(id_empaque, cantidad, tipo, motivo, descripcion, fecha_hora) " +
+                 "VALUES (?, ?, 'ENTRADA', ?, ?, NOW())";
+    try (PreparedStatement ps = con.prepareStatement(sql)) {
+        ps.setInt(1, idEmpaque);
+        ps.setInt(2, cantidad);
+        ps.setString(3, motivo);
+        ps.setString(4, descripcion);
+        ps.executeUpdate();
+    }
+}
     
    // NUEVO: movimientos por empaque (para el modal)
 public List<InventarioEmpaquetado> listarMovimientosPorEmpaque(int idEmpaque) throws SQLException {
