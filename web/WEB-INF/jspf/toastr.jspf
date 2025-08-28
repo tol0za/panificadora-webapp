@@ -1,0 +1,64 @@
+<%@ taglib uri="http://java.sun.com/jsp/jstl/core"       prefix="c"   %>
+<%@ taglib uri="http://java.sun.com/jsp/jstl/functions"  prefix="fn"  %>
+
+<!-- Toastr (depende de jQuery) -->
+<link  href="https://cdn.jsdelivr.net/npm/toastr@2.1.4/build/toastr.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/toastr@2.1.4/build/toastr.min.js"></script>
+
+<!-- Contenedores con mensajes (session scope) -->
+<div id="toast-session" class="d-none"
+     data-ok   ="<c:out value='${sessionScope.flashOk}'/>"
+     data-info ="<c:out value='${sessionScope.flashInfo}'/>"
+     data-warn ="<c:out value='${sessionScope.flashWarn}'/>"
+     data-err  ="<c:out value='${sessionScope.flashErr}'/>"
+     data-mail ="<c:out value='${sessionScope.flashMail}'/>"
+     data-salida ="<c:out value='${sessionScope.flashSalida}'/>"></div>
+
+<!-- Contenedores con mensajes (request scope) -->
+<div id="toast-request" class="d-none"
+     data-ok   ="<c:out value='${requestScope.flashOk}'/>"
+     data-info ="<c:out value='${requestScope.flashInfo}'/>"
+     data-warn ="<c:out value='${requestScope.flashWarn}'/>"
+     data-err  ="<c:out value='${requestScope.flashErr}'/>"
+     data-mail ="<c:out value='${requestScope.flashMail}'/>"
+     data-salida ="<c:out value='${requestScope.flashSalida}'/>"></div>
+
+<!-- Limpia los flash de sesión (para que no reaparezcan en reload) -->
+<c:forEach var="k" items="${['flashOk','flashInfo','flashWarn','flashErr','flashMail','flashSalida']}">
+  <c:if test="${not empty sessionScope[k]}">
+    <c:remove var="${k}" scope="session"/>
+  </c:if>
+</c:forEach>
+
+<script>
+(function(){
+  if (!window.toastr) return;
+  toastr.options = {
+    closeButton: true,
+    progressBar: true,
+    newestOnTop: true,
+    timeOut: 3800,
+    extendedTimeOut: 2200,
+    positionClass: "toast-top-right",
+    preventDuplicates: true
+  };
+
+  function pushFrom(el){
+    if(!el) return;
+    function show(attr, fn){
+      var txt = (el.getAttribute('data-'+attr) || '').trim();
+      if (txt) fn(txt);
+    }
+    show('ok',    function(m){ toastr.success(m); });
+    show('info',  function(m){ toastr.info(m); });
+    show('warn',  function(m){ toastr.warning(m); });
+    show('err',   function(m){ toastr.error(m); });
+    show('mail',  function(m){ toastr.success(m, 'Correo'); });
+    show('salida',function(m){ toastr.success(m, 'Distribución'); });
+  }
+
+  pushFrom(document.getElementById('toast-session'));
+  pushFrom(document.getElementById('toast-request'));
+})();
+</script>

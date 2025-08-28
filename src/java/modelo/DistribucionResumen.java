@@ -1,13 +1,12 @@
-package dto;
+package modelo;
 
 public class DistribucionResumen {
     private int idDistribucion;
     private int idRepartidor;
-    private String nombreRepartidor; // "Nombre Apellido"
-    // Campos de resumen opcionales
-    private String fecha;        // yyyy-MM-dd
-    private int totalEmpaques;   // líneas
-    private int totalPiezas;     // sum(cantidad)
+    private String nombreRepartidor;
+    private int totalEmpaques;
+    private int totalPiezas;
+    private String fecha;
 
     public DistribucionResumen() {}
 
@@ -17,6 +16,7 @@ public class DistribucionResumen {
         this.nombreRepartidor = nombreRepartidor;
     }
 
+    // Getters y Setters
     public int getIdDistribucion() { return idDistribucion; }
     public void setIdDistribucion(int idDistribucion) { this.idDistribucion = idDistribucion; }
 
@@ -26,12 +26,12 @@ public class DistribucionResumen {
     public String getNombreRepartidor() { return nombreRepartidor; }
     public void setNombreRepartidor(String nombreRepartidor) { this.nombreRepartidor = nombreRepartidor; }
 
-    public String getFecha() { return fecha; }
-    public void setFecha(String fecha) { this.fecha = fecha; }
-
     public int getTotalEmpaques() { return totalEmpaques; }
     public void setTotalEmpaques(int totalEmpaques) { this.totalEmpaques = totalEmpaques; }
 
     public int getTotalPiezas() { return totalPiezas; }
     public void setTotalPiezas(int totalPiezas) { this.totalPiezas = totalPiezas; }
+
+    public String getFecha() { return fecha; }
+    public void setFecha(String fecha) { this.fecha = fecha; }
 }
